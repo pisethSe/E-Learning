@@ -1,0 +1,164 @@
+@import url("https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,100..700;1,100..700&display=swap");
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-kantumruy);
+  --font-heading: var(--font-kantumruy);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-dark: var(--dark);
+  --color-light: var(--light);
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+}
+
+@layer base {
+  :root {
+    --font-kantumruy: "Kantumruy Pro", sans-serif;
+    --background: #ffffff;
+    --foreground: #000000;
+    --card: #ffffff;
+    --card-foreground: #000000;
+    --popover: #ffffff;
+    --popover-foreground: #000000;
+    --primary: #000000;
+    --primary-foreground: #ffffff;
+    --secondary: #f3f4f6;
+    --secondary-foreground: #000000;
+    --muted: #f3f4f6;
+    --muted-foreground: #525252;
+    --accent: #e5e7eb;
+    --accent-foreground: #000000;
+    --destructive: #dc2626;
+    --border: #e5e7eb;
+    --input: #e5e7eb;
+    --ring: #a3a3a3;
+    --dark: #000000;
+    --light: #ffffff;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-kantumruy);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    max-width: 100%;
+  }
+
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  a,
+  button,
+  span {
+    overflow-wrap: break-word;
+  }
+}
+
+@layer utilities {
+  .perspective-\[900px\] {
+    perspective: 900px;
+  }
+}
+
+.infinite-slider {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 8%,
+    black 92%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 8%,
+    black 92%,
+    transparent
+  );
+}
+
+.infinite-slider__track {
+  display: flex;
+  width: max-content;
+  gap: var(--slider-gap);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+}
+
+.infinite-slider__group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: stretch;
+  gap: var(--slider-gap);
+}
+
+.infinite-slider__item {
+  flex-shrink: 0;
+}
+
+@keyframes attraction-chip-shake {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+
+  20% {
+    transform: translate3d(-10px, -6px, 0) rotate(-3deg);
+  }
+
+  40% {
+    transform: translate3d(12px, 4px, 0) rotate(3deg);
+  }
+
+  60% {
+    transform: translate3d(-8px, 8px, 0) rotate(-2deg);
+  }
+
+  80% {
+    transform: translate3d(8px, -4px, 0) rotate(2deg);
+  }
+}
+
+.attraction-chip-shake {
+  animation: attraction-chip-shake 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}

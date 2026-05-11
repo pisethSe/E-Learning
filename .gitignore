@@ -24,6 +24,7 @@ backend/uploads/*
 # IDE
 .vscode/
 .idea/
+.local-git-backups/
 *.swp
 *.swo
 
