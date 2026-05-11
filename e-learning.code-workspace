@@ -1,0 +1,24 @@
+{
+  "folders": [
+    {
+      "name": "🎓 User Frontend",
+      "path": "user-frontend"
+    },
+    {
+      "name": "⚙️ Admin Frontend",
+      "path": "admin-frontend"
+    },
+    {
+      "name": "🔧 Backend API",
+      "path": "backend"
+    },
+    {
+      "name": "📁 Root",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "python.defaultInterpreterPath": "./backend/venv/bin/python",
+    "python.terminal.activateEnvironment": true
+  }
+}
