@@ -1,6 +1,6 @@
-import React, { Suspense, lazy, useEffect, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { CalendarDays, LogOut, RefreshCcw } from "lucide-react";
+import React, { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { CalendarDays, ChevronRight, LogOut, RefreshCcw, UploadCloud } from "lucide-react";
 import AdminSidebar from "./components/layout/AdminSidebar";
 import { Button } from "./components/ui/Button";
 import LoginPage from "./pages/LoginPage";
@@ -8,17 +8,28 @@ import {
   API_BASE_URL,
   deleteAdminEvent,
   deleteAdminResource,
+  fetchCurrentAdmin,
   fetchAdminEvents,
   fetchAdminResources,
   fetchAdminStats,
+  loginAdmin,
+  logoutAdmin,
   saveAdminEvent,
   saveAdminResource,
 } from "./services/api";
 import {
-  clearStoredAdminName,
-  getStoredAdminName,
-  setStoredAdminName,
+  clearStoredAdminUser,
+  getAdminDisplayName,
+  getStoredAdminUser,
+  setStoredAdminUser,
 } from "./services/auth";
+import {
+  MOCK_ADMIN_EVENTS,
+  MOCK_ADMIN_RESOURCES,
+  MOCK_ADMIN_STATS,
+  isMockRecordId,
+  shouldUseMockAdminData,
+} from "./data/mockAdminData";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const UploadPage = lazy(() => import("./pages/UploadPage"));
@@ -30,19 +41,19 @@ const DEFAULT_FEEDBACK = { type: "", message: "" };
 const PAGE_META = {
   "/": {
     title: "Overview",
-    description: "Monitor content, uploads, and publishing activity.",
+    description: "Monitor catalog coverage, publishing status, and student-facing content.",
   },
   "/upload": {
     title: "Upload",
-    description: "Manage resources and event publishing in one place.",
+    description: "Add image files, documents, Khmer Literature audio, and event videos.",
   },
   "/analytics": {
     title: "Analytics",
-    description: "Track library breakdowns and publishing health.",
+    description: "Track grade, subject, category, audio, and event video coverage.",
   },
   "/settings": {
     title: "Settings",
-    description: "Update workspace preferences and connection details.",
+    description: "Review workspace settings and catalog rules.",
   },
 };
 
@@ -53,48 +64,75 @@ function TopBar({
   onSignOut,
 }) {
   const location = useLocation();
-  const meta = PAGE_META[location.pathname] || PAGE_META["/"];
+  const meta =
+    PAGE_META[location.pathname] ||
+    (location.pathname.startsWith("/upload") ? PAGE_META["/upload"] : PAGE_META["/"]);
   const today = new Intl.DateTimeFormat("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
   }).format(new Date());
+  const pageTitle = meta.title === "Overview" ? "My dashboard" : meta.title;
+  const initials = (adminName || "A").slice(0, 1).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur">
-      <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-5 xl:flex-row xl:items-center xl:justify-between">
+    <header className="sticky top-16 z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur md:top-0">
+      <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-            <span>Grade A Admin</span>
-            <span className="hidden sm:inline">/</span>
-            <span className="hidden sm:inline">{meta.title}</span>
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-800">
+              {initials}
+            </span>
+            <span className="max-w-[10rem] truncate">{adminName}</span>
+            <ChevronRight size={16} className="text-slate-300" />
+            <span className="text-slate-900">{meta.title}</span>
           </div>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-            {meta.title}
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+            {pageTitle}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">{meta.description}</p>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">{meta.description}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600">
+          <div className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 shadow-sm">
             <CalendarDays size={16} className="text-slate-400" />
             <span>{today}</span>
           </div>
-          <div className="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 sm:block">
-            Working as <span className="font-semibold text-slate-900">{adminName}</span>
-          </div>
-          <Button variant="outline" onClick={onRefresh} disabled={isRefreshing}>
-            <RefreshCcw size={16} className={`mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+          <Button
+            variant="outline"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="h-11 gap-2"
+          >
+            <RefreshCcw size={16} className={isRefreshing ? "animate-spin" : ""} />
             {isRefreshing ? "Refreshing" : "Refresh"}
           </Button>
-          <Button variant="ghost" onClick={onSignOut}>
-            <LogOut size={16} className="mr-2" />
-            Switch Admin
+          <Link to="/upload/file">
+            <Button className="h-11 gap-2">
+              <UploadCloud size={16} />
+              New upload
+            </Button>
+          </Link>
+          <Button variant="ghost" onClick={onSignOut} className="h-11 gap-2">
+            <LogOut size={16} />
+            <span className="hidden sm:inline">Switch Admin</span>
           </Button>
         </div>
       </div>
     </header>
   );
+}
+
+function getFeedbackClasses(type) {
+  if (type === "success") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (type === "info") {
+    return "border-sky-200 bg-sky-50 text-sky-700";
+  }
+
+  return "border-red-200 bg-red-50 text-red-700";
 }
 
 function AppShell({
@@ -118,7 +156,7 @@ function AppShell({
     <div className="min-h-screen bg-slate-50">
       <AdminSidebar adminName={adminName} />
 
-      <div className="min-h-screen md:ml-64">
+      <div className="min-h-screen pt-16 md:ml-72 md:pt-0">
         <TopBar
           adminName={adminName}
           isRefreshing={isRefreshing}
@@ -126,14 +164,10 @@ function AppShell({
           onSignOut={onSignOut}
         />
 
-        <main className="px-4 pb-8 pt-20 sm:px-6 lg:px-8 lg:pt-8">
+        <main className="mx-auto max-w-[1440px] px-4 pb-10 pt-6 sm:px-6 lg:px-8">
           {feedback.message ? (
             <div
-              className={`mb-6 rounded-xl border px-4 py-3 text-sm font-medium ${
-                feedback.type === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-red-200 bg-red-50 text-red-700"
-              }`}
+              className={`mb-6 rounded-lg border px-4 py-3 text-sm font-semibold ${getFeedbackClasses(feedback.type)}`}
             >
               {feedback.message}
             </div>
@@ -159,7 +193,7 @@ function AppShell({
                 }
               />
               <Route
-                path="/upload"
+                path="/upload/:tab?"
                 element={
                   <UploadPage
                     resources={resources}
@@ -206,17 +240,59 @@ function AppShell({
 }
 
 function App() {
-  const [adminName, setAdminName] = useState(() => getStoredAdminName());
+  const [adminUser, setAdminUser] = useState(() => getStoredAdminUser());
   const [stats, setStats] = useState(null);
   const [resources, setResources] = useState([]);
   const [events, setEvents] = useState([]);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingResource, setIsSavingResource] = useState(false);
   const [isSavingEvent, setIsSavingEvent] = useState(false);
   const [feedback, setFeedback] = useState(DEFAULT_FEEDBACK);
+  const adminName = getAdminDisplayName(adminUser);
 
-  async function loadAdminData({ silent = false } = {}) {
+  const clearAdminSession = useCallback(() => {
+    clearStoredAdminUser();
+    setAdminUser(null);
+    setStats(null);
+    setResources([]);
+    setEvents([]);
+    setFeedback(DEFAULT_FEEDBACK);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function verifySession() {
+      try {
+        const currentUser = await fetchCurrentAdmin();
+        if (!isMounted) {
+          return;
+        }
+
+        setStoredAdminUser(currentUser);
+        setAdminUser(currentUser);
+      } catch {
+        if (isMounted) {
+          clearStoredAdminUser();
+          setAdminUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsCheckingSession(false);
+        }
+      }
+    }
+
+    void verifySession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const loadAdminData = useCallback(async ({ silent = false } = {}) => {
     try {
       if (silent) {
         setIsRefreshing(true);
@@ -232,22 +308,46 @@ function App() {
         fetchAdminEvents(),
       ]);
 
+      const nextResources = Array.isArray(resourcesData) ? resourcesData : [];
+      const nextEvents = Array.isArray(eventsData) ? eventsData : [];
+
+      if (shouldUseMockAdminData(statsData, nextResources, nextEvents)) {
+        setStats(MOCK_ADMIN_STATS);
+        setResources(MOCK_ADMIN_RESOURCES);
+        setEvents(MOCK_ADMIN_EVENTS);
+        setFeedback({
+          type: "info",
+          message: "Showing sample data because the admin catalog is empty.",
+        });
+        return;
+      }
+
       setStats(statsData);
-      setResources(Array.isArray(resourcesData) ? resourcesData : []);
-      setEvents(Array.isArray(eventsData) ? eventsData : []);
+      setResources(nextResources);
+      setEvents(nextEvents);
     } catch (error) {
+      if (error.status === 401 || error.status === 403) {
+        clearAdminSession();
+        return;
+      }
+
+      setStats(MOCK_ADMIN_STATS);
+      setResources(MOCK_ADMIN_RESOURCES);
+      setEvents(MOCK_ADMIN_EVENTS);
       setFeedback({
-        type: "error",
-        message: error.message || "Unable to load admin data.",
+        type: "info",
+        message:
+          error.message ||
+          "Showing sample data because the admin backend is not available.",
       });
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }
+  }, [clearAdminSession]);
 
   useEffect(() => {
-    if (!adminName) {
+    if (!adminUser || isCheckingSession) {
       return;
     }
 
@@ -258,20 +358,34 @@ function App() {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [adminName]);
+  }, [adminUser, isCheckingSession, loadAdminData]);
 
   async function handleResourceSave(payload) {
+    if (isMockRecordId(payload.id)) {
+      setFeedback({
+        type: "info",
+        message: "Sample rows are read-only. Create a new upload to save real data.",
+      });
+      return false;
+    }
+
     setIsSavingResource(true);
     setFeedback(DEFAULT_FEEDBACK);
 
     try {
       await saveAdminResource(payload);
       await loadAdminData({ silent: true });
+      const resourceLabel =
+        payload.file_type === "audio"
+          ? "Audio"
+          : payload.file_type === "image"
+            ? "Image file"
+            : "File";
       setFeedback({
         type: "success",
         message: payload.id
-          ? "Resource updated successfully."
-          : "Resource uploaded successfully.",
+          ? `${resourceLabel} updated successfully.`
+          : `${resourceLabel} uploaded successfully.`,
       });
       return true;
     } catch (error) {
@@ -286,6 +400,14 @@ function App() {
   }
 
   async function handleEventSave(payload) {
+    if (isMockRecordId(payload.id)) {
+      setFeedback({
+        type: "info",
+        message: "Sample events are read-only. Create a new event to save real data.",
+      });
+      return false;
+    }
+
     setIsSavingEvent(true);
     setFeedback(DEFAULT_FEEDBACK);
 
@@ -311,6 +433,14 @@ function App() {
   }
 
   async function handleResourceDelete(resourceId) {
+    if (isMockRecordId(resourceId)) {
+      setFeedback({
+        type: "info",
+        message: "Sample rows are read-only. Add real content when you are ready.",
+      });
+      return;
+    }
+
     const confirmed = window.confirm(
       "Delete this resource from the admin panel and website?",
     );
@@ -334,6 +464,14 @@ function App() {
   }
 
   async function handleEventDelete(eventId) {
+    if (isMockRecordId(eventId)) {
+      setFeedback({
+        type: "info",
+        message: "Sample events are read-only. Add a real event when you are ready.",
+      });
+      return;
+    }
+
     const confirmed = window.confirm(
       "Delete this event from the admin panel and website?",
     );
@@ -356,21 +494,29 @@ function App() {
     }
   }
 
-  function handleEnterWorkspace(nextAdminName) {
-    setStoredAdminName(nextAdminName);
-    setAdminName(nextAdminName);
+  async function handleEnterWorkspace(credentials) {
+    const authResponse = await loginAdmin(credentials);
+    setStoredAdminUser(authResponse.user);
+    setAdminUser(authResponse.user);
   }
 
-  function handleSignOut() {
-    clearStoredAdminName();
-    setAdminName("");
-    setStats(null);
-    setResources([]);
-    setEvents([]);
-    setFeedback(DEFAULT_FEEDBACK);
+  async function handleSignOut() {
+    try {
+      await logoutAdmin();
+    } finally {
+      clearAdminSession();
+    }
   }
 
-  if (!adminName) {
+  if (isCheckingSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10 text-sm font-semibold text-white">
+        Checking admin session...
+      </main>
+    );
+  }
+
+  if (!adminUser) {
     return <LoginPage onSubmit={handleEnterWorkspace} />;
   }
 

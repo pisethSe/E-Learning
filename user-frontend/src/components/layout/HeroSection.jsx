@@ -165,7 +165,7 @@ const heroContent = {
     sourceValue: "Telegram channel @bacii26w",
     stats: [
       { value: "9-12", label: "ថ្នាក់សិក្សា" },
-      { value: "6", label: "ប្រភេទឯកសារ" },
+      { value: "5", label: "ប្រភេទឯកសារ" },
       { value: "Audio", label: "មេរៀនសំឡេង" },
     ],
     sliderEyebrow: "សៀវភៅ និង E-book",
@@ -188,7 +188,7 @@ const heroContent = {
     sourceValue: "Telegram channel @bacii26w",
     stats: [
       { value: "9-12", label: "Grade levels" },
-      { value: "6", label: "Resource types" },
+      { value: "5", label: "Resource types" },
       { value: "Audio", label: "Lesson support" },
     ],
     sliderEyebrow: "Books And E-books",

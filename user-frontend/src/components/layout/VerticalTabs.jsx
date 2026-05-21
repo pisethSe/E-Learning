@@ -19,9 +19,9 @@ const SERVICES = [
     title: "ទាញយកឯកសារ",
     titleEn: "Download Files",
     description:
-      "ទាញយក កំណេរលំហាត់ រូបមន្ត វិញ្ញាសា ឯកសារ និង E-book ដែលប្រមូលពី channel Telegram bacii26w បាននៅកន្លែងតែមួយ។",
+      "ទាញយក កំណែលំហាត់ រូបមន្ត វិញ្ញាសា ឯកសារ និង E-book ដែល admin បានបញ្ចូលនៅកន្លែងតែមួយ។",
     descriptionEn:
-      "Download exercises, formulas, exam papers, documents, and e-books collected from the bacii26w Telegram channel in one place.",
+      "Download answer keys, formulas, exam papers, documents, and e-books uploaded from the admin dashboard.",
     image: "/learning-steps/step-2.jpg",
   },
   {
@@ -29,9 +29,9 @@ const SERVICES = [
     title: "ស្តាប់សំឡេងមេរៀន",
     titleEn: "Listen To Audio",
     description:
-      "ស្តាប់សំឡេងមេរៀនពីប្រភព Telegram channel ដើម្បីជួយក្នុងការស្វ័យសិក្សា និងការរំលឹកមេរៀនឡើងវិញ។",
+      "ស្តាប់សំឡេងរឿងអក្សរសាស្ត្រខ្មែរ ដើម្បីជួយក្នុងការតែងសេចក្ដី និងការរំលឹកមេរៀនឡើងវិញ។",
     descriptionEn:
-      "Listen to lesson audio from the Telegram source to support self-study and reinforce revision.",
+      "Listen to Khmer Literature story audio to support essay writing and revision.",
     image: "/learning-steps/step-3.jpg",
   },
   {

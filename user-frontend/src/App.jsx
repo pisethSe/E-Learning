@@ -299,11 +299,11 @@ function App() {
       case "about":
         return <AboutPage language={language} />;
       case "grade":
-        return <GradePage grade={route.grade} />;
+        return <GradePage grade={route.grade} language={language} />;
       case "subject":
-        return <SubjectPage subject={route.subject} />;
+        return <SubjectPage subject={route.subject} language={language} />;
       case "search":
-        return <SearchPage query={route.query} />;
+        return <SearchPage query={route.query} language={language} />;
       default:
         return <NotFoundPage />;
     }

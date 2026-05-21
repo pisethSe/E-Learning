@@ -9,34 +9,11 @@ import {
 } from "lucide-react";
 import AudioPlayer from "@/components/resources/AudioPlayer";
 import { fetchResources, resolveResourceUrl } from "@/services/api";
-
-const SUBJECT_LABELS = {
-  Mathematics: "គណិតវិទ្យា",
-  Physics: "រូបវិទ្យា",
-  Chemistry: "គីមីវិទ្យា",
-  Biology: "ជីវវិទ្យា",
-  "Khmer Literature": "អក្សរសាស្ត្រខ្មែរ",
-  History: "ប្រវត្តិវិទ្យា",
-  Geography: "ភូមិវិទ្យា",
-  English: "ភាសាអង់គ្លេស",
-};
-
-function extractKhmerText(value = "") {
-  return (
-    String(value)
-      .match(/[\u1780-\u17FF\s\d]+/g)
-      ?.join(" ")
-      .trim() || ""
-  );
-}
-
-function getSubjectLabel(subject = "", language = "km") {
-  if (language !== "km") {
-    return subject;
-  }
-
-  return SUBJECT_LABELS[subject] || extractKhmerText(subject) || subject;
-}
+import {
+  AUDIO_SUBJECT,
+  extractKhmerText,
+  getSubjectLabel,
+} from "@/data/learningCatalog";
 
 function formatCreatedAt(value, language = "km") {
   if (!value) {
@@ -97,7 +74,7 @@ export default function EventAudioSection({ language = "km" }) {
         setLoading(true);
         setHasError(false);
         const data = await fetchResources(
-          { file_type: "audio" },
+          { file_type: "audio", subject: AUDIO_SUBJECT },
           { signal: abortController.signal },
         );
 
@@ -173,25 +150,29 @@ export default function EventAudioSection({ language = "km" }) {
               <div className="max-w-3xl">
                 <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-black/55 shadow-sm">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Event Audio
+                  {isKhmer ? "សំឡេងអក្សរសាស្ត្រខ្មែរ" : "Khmer Literature Audio"}
                 </div>
 
                 <p className="mt-5 text-sm font-semibold uppercase tracking-[0.26em] text-black/42">
-                  {isKhmer ? "អាចស្តាប់បានគ្រប់ពេល" : "Learn with audio"}
+                  {isKhmer ? "សម្រាប់តែងសេចក្ដី" : "For essay writing"}
                 </p>
 
                 <h2 className="mt-3 text-3xl font-bold leading-tight text-black md:text-4xl lg:text-5xl">
-                  ស្តាប់សំឡេងមេរៀនទាំងអស់បានយ៉ាងងាយស្រួល
+                  {isKhmer
+                    ? "រឿងអក្សរសាស្ត្រខ្មែរ សម្រាប់តែងសេចក្ដី"
+                    : "Khmer Literature Stories for Essay Writing"}
                 </h2>
 
                 <p className="mt-3 max-w-2xl text-lg font-medium leading-8 text-black/72 md:text-xl">
-                  Listen to every lesson audio in one clean, easy-to-use place.
+                  {isKhmer
+                    ? "រឿងអក្សរសាស្ត្រខ្មែរ ជាឯកសារសំឡេង"
+                    : "Khmer Literature Story Audio Files"}
                 </p>
 
                 <p className="mt-4 max-w-2xl text-base leading-8 text-black/62 md:text-lg">
                   {isKhmer
-                    ? "ផ្នែកនេះប្រមូលសំឡេងមេរៀនទាំងអស់សម្រាប់ឱ្យសិស្សស្តាប់បានឆាប់ រកបានងាយ ហើយប្រើប្រាស់បានស្រួលលើទូរស័ព្ទ និងកុំព្យូទ័រ។"
-                    : "This section gathers all lesson audio into a clear, professional layout that is easy to browse and play on both mobile and desktop."}
+                    ? "ផ្នែកនេះប្រមូលសំឡេងរឿងអក្សរសាស្ត្រខ្មែរ ដើម្បីឱ្យសិស្សស្តាប់ រំលឹកខ្លឹមសារ និងយកគំនិតទៅប្រើក្នុងការតែងសេចក្ដី។"
+                    : "This section gathers Khmer Literature story audio so students can listen, revise, and use story ideas in essay writing."}
                 </p>
               </div>
 
@@ -234,10 +215,10 @@ export default function EventAudioSection({ language = "km" }) {
                     </span>
                   </div>
                   <p className="mt-4 text-lg font-bold text-black">
-                    {isKhmer ? "ស្អាត និងស្រួលប្រើ" : "Clean and easy"}
+                  {isKhmer ? "ស្អាត និងស្រួលប្រើ" : "Clean and easy"}
                   </p>
                   <p className="mt-1 text-sm text-black/55">
-                    {isKhmer ? "បើកស្តាប់ភ្លាមៗ" : "Play instantly"}
+                  {isKhmer ? "បើកស្តាប់ភ្លាមៗ" : "Play instantly"}
                   </p>
                 </div>
               </div>
@@ -248,12 +229,12 @@ export default function EventAudioSection({ language = "km" }) {
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-xl font-bold text-black md:text-2xl">
-                  {isKhmer ? "បញ្ជីសំឡេងទាំងអស់" : "All audio lessons"}
+                  {isKhmer ? "បញ្ជីសំឡេងរឿងទាំងអស់" : "All story audio"}
                 </h3>
                 <p className="mt-1 text-sm leading-7 text-black/58">
                   {isKhmer
-                    ? "ជ្រើសសំឡេងដែលអ្នកចង់ស្តាប់ ហើយចុច Play ដើម្បីរៀនភ្លាមៗ។"
-                    : "Choose any audio below and press play to start listening right away."}
+                    ? "ជ្រើសរឿងដែលអ្នកចង់ស្តាប់ ហើយចុច Play ដើម្បីរៀនភ្លាមៗ។"
+                    : "Choose any story audio below and press play to start listening right away."}
                 </p>
               </div>
 
@@ -292,12 +273,12 @@ export default function EventAudioSection({ language = "km" }) {
                   <h3 className="mt-4 text-xl font-bold text-black">
                     {isKhmer
                       ? "មិនទាន់មានសំឡេងមេរៀននៅឡើយ"
-                      : "No audio lessons yet"}
+                      : "No Khmer Literature audio yet"}
                   </h3>
                   <p className="mt-3 text-sm leading-7 text-black/60">
                     {isKhmer
                       ? "នៅពេល admin បន្ថែមសំឡេងមេរៀន វានឹងបង្ហាញនៅទីនេះដោយស្វ័យប្រវត្តិ។"
-                      : "As soon as new audio resources are published, they will appear here automatically."}
+                      : "As soon as Khmer Literature audio is published, it will appear here automatically."}
                   </p>
                 </div>
               )}

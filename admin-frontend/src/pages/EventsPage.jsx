@@ -14,7 +14,7 @@ const DEFAULT_FORM = {
   cta_label: "",
   cta_url: "",
   is_published: true,
-  image: null,
+  media: null,
 };
 
 const EVENT_STATUSES = [
@@ -44,7 +44,7 @@ function createInitialState(event) {
     cta_label: event.cta_label || "",
     cta_url: event.cta_url || "",
     is_published: Boolean(event.is_published),
-    image: null,
+    media: null,
   };
 }
 
@@ -71,15 +71,17 @@ function EventForm({ event, onSubmit, onCancel, isSaving }) {
   }
 
   return (
-    <Card className="xl:sticky xl:top-28">
-      <div className="mb-6 flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-            Event publishing
-          </p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-900">
-            {event ? "Edit event" : "Create event"}
-          </h3>
+    <Card>
+      <div className="mb-6 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Event video upload
+            </p>
+            <h3 className="text-lg font-semibold text-slate-900">
+              {event ? "Edit event video" : "Add event video"}
+            </h3>
+          </div>
         </div>
         {event ? (
           <button
@@ -173,14 +175,17 @@ function EventForm({ event, onSubmit, onCancel, isSaving }) {
         </label>
 
         <label className="block">
-          <FieldLabel>{event ? "Replace event image" : "Upload event image"}</FieldLabel>
+          <FieldLabel>{event ? "Replace event video" : "Upload event video"}</FieldLabel>
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
             <input
               type="file"
-              accept="image/*"
-              onChange={(eventTarget) => updateField("image", eventTarget.target.files?.[0] || null)}
+              accept="video/*,.mp4,.webm,.mov,.m4v,.ogg"
+              onChange={(eventTarget) => updateField("media", eventTarget.target.files?.[0] || null)}
               className="block w-full text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-4 file:py-2 file:font-medium file:text-white hover:file:bg-emerald-700"
             />
+            <p className="mt-2 text-xs text-slate-500">
+              Upload a video about the event for the public events page.
+            </p>
           </div>
         </label>
 
@@ -226,14 +231,16 @@ function EventForm({ event, onSubmit, onCancel, isSaving }) {
 function EventList({ events, onEdit, onDelete, isLoading }) {
   return (
     <Card>
-      <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-            Upcoming list
-          </p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-900">
-            {events.length} events in the admin feed
-          </h3>
+      <div className="mb-6 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Event videos library
+            </p>
+            <h3 className="text-lg font-semibold text-slate-900">
+              {events.length} of {events.length} event video library items
+            </h3>
+          </div>
         </div>
       </div>
 
@@ -251,15 +258,24 @@ function EventList({ events, onEdit, onDelete, isLoading }) {
                 key={event.id}
                 className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 lg:grid-cols-[180px,1fr]"
               >
-                {event.image_path ? (
-                  <img
-                    className="h-44 w-full rounded-lg object-cover"
-                    src={resolveAssetUrl(event.image_path)}
-                    alt={event.title}
-                  />
+                {(event.media_path || event.image_path) ? (
+                  event.media_type === "video" ? (
+                    <video
+                      className="h-44 w-full rounded-lg bg-slate-900 object-cover"
+                      src={resolveAssetUrl(event.media_path)}
+                      controls
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img
+                      className="h-44 w-full rounded-lg object-cover"
+                      src={resolveAssetUrl(event.media_path || event.image_path)}
+                      alt={event.title}
+                    />
+                  )
                 ) : (
                   <div className="flex h-44 items-center justify-center rounded-lg bg-slate-200 text-sm text-slate-500">
-                    No image
+                    No media
                   </div>
                 )}
 
@@ -339,7 +355,7 @@ export default function EventsPage({
   }
 
   return (
-    <section className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[380px,1fr]">
+    <section className="space-y-6">
       <EventForm
         key={editingEvent ? `event-${editingEvent.id}` : "event-new"}
         event={editingEvent}

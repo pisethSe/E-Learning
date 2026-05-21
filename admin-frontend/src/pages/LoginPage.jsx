@@ -3,15 +3,31 @@ import { Layers, LogIn } from "lucide-react";
 import { Button } from "../components/ui/Button";
 
 export default function LoginPage({ onSubmit }) {
-  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    if (!name.trim()) {
+    if (!email.trim() || !password) {
+      setErrorMessage("Enter your admin email and password.");
       return;
     }
 
-    onSubmit(name);
+    setErrorMessage("");
+    setIsSubmitting(true);
+
+    try {
+      await onSubmit({
+        email: email.trim(),
+        password,
+      });
+    } catch (error) {
+      setErrorMessage(error.message || "Unable to sign in.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -31,19 +47,18 @@ export default function LoginPage({ onSubmit }) {
               </div>
             </div>
             <h2 className="mt-16 max-w-md text-4xl font-bold leading-tight tracking-tight">
-              Manage school resources, events, and publishing from one clean workspace.
+              Manage study files, Khmer audio, and event videos from one catalog workspace.
             </h2>
             <p className="mt-4 max-w-lg text-sm leading-7 text-primary-100/80">
-              This admin dashboard is built in React JSX and styled to match the
-              dashboard template direction you shared.
+              Upload content once, then students can filter it by grade, subject, and category on the public website.
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             {[
-              ["Resources", "Library uploads"],
-              ["Events", "Student announcements"],
-              ["Insights", "Publishing analytics"],
+              ["5 categories", "Files and e-books"],
+              ["Khmer audio", "Essay story listening"],
+              ["Event videos", "Student updates"],
             ].map(([title, copy]) => (
               <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <p className="text-sm font-semibold">{title}</p>
@@ -58,29 +73,51 @@ export default function LoginPage({ onSubmit }) {
             Grade A admin
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-            Open dashboard
+            Sign in
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            Enter your display name to access the content management dashboard.
+            Use your admin account to access the Grade A catalog dashboard.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">
-                Admin display name
+                Admin email
               </span>
               <input
                 autoFocus
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Piseth"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="admin@example.com"
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
               />
             </label>
 
-            <Button type="submit" size="lg" className="w-full">
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">
+                Password
+              </span>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter your password"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
+              />
+            </label>
+
+            {errorMessage ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                {errorMessage}
+              </div>
+            ) : null}
+
+            <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
               <LogIn size={18} className="mr-2" />
-              Enter Workspace
+              {isSubmitting ? "Signing in..." : "Enter Workspace"}
             </Button>
           </form>
         </section>

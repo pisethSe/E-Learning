@@ -18,20 +18,27 @@ import {
 import {
   Calendar,
   FileText,
-  MousePointerClick,
+  Headphones,
+  ImagePlus,
   TrendingUp,
-  UploadCloud,
+  Video,
 } from "lucide-react";
 import { Card } from "../components/ui/Card";
 import {
-  buildCountMap,
   buildRecentActivity,
   formatCompactNumber,
+  getAudioResources,
+  getCatalogHealth,
+  getCategoryCounts,
+  getFileResources,
+  getGradeCounts,
+  getPhotoResources,
+  getPublishedItems,
+  getSubjectCounts,
   getSummary,
-  toSortedEntries,
 } from "../utils/dashboard";
 
-const COLORS = ["#4f46e5", "#3b82f6", "#0ea5e9", "#64748b"];
+const COLORS = ["#4f46e5", "#0ea5e9", "#14b8a6", "#f59e0b", "#ec4899"];
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -39,8 +46,8 @@ const containerVariants = {
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.32 } },
 };
 
 function CustomTooltip({ active, payload, label }) {
@@ -50,12 +57,12 @@ function CustomTooltip({ active, payload, label }) {
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-card">
-      <p className="mb-2 text-sm font-semibold text-slate-900">{label}</p>
+      <p className="mb-2 text-sm font-semibold text-slate-900">{label || payload[0].name}</p>
       {payload.map((entry) => (
-        <p key={entry.dataKey} className="flex items-center gap-2 text-sm">
+        <p key={`${entry.dataKey}-${entry.name}`} className="flex items-center gap-2 text-sm">
           <span
             className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: entry.color }}
+            style={{ backgroundColor: entry.color || entry.fill }}
           />
           <span className="text-slate-600">{entry.name}:</span>
           <span className="font-medium text-slate-900">{entry.value}</span>
@@ -71,62 +78,62 @@ export default function AnalyticsPage({
   events,
 }) {
   const summary = getSummary(stats);
-
+  const photoResources = useMemo(() => getPhotoResources(resources), [resources]);
+  const fileResources = useMemo(() => getFileResources(resources), [resources]);
+  const audioResources = useMemo(() => getAudioResources(resources), [resources]);
+  const health = useMemo(() => getCatalogHealth(resources, events), [events, resources]);
+  const categoryData = useMemo(
+    () => getCategoryCounts(resources).filter((item) => item.value > 0),
+    [resources],
+  );
+  const categoryCoverageData = useMemo(() => getCategoryCounts(resources), [resources]);
+  const gradeData = useMemo(() => getGradeCounts(resources), [resources]);
+  const subjectData = useMemo(
+    () =>
+      getSubjectCounts(resources)
+        .filter((item) => item.value > 0)
+        .slice(0, 8)
+        .map((item) => ({
+          name: item.subject,
+          uploads: item.value,
+        })),
+    [resources],
+  );
   const trendData = useMemo(
     () => buildRecentActivity(resources, events, 7),
     [events, resources],
   );
 
-  const typeData = [
-    { name: "Documents", value: summary.total_documents },
-    { name: "Images", value: summary.total_images },
-    { name: "Audio", value: summary.total_audio },
-    {
-      name: "Events",
-      value: summary.total_events,
-    },
-  ].filter((item) => item.value > 0);
-
-  const subjectData = useMemo(
-    () =>
-      toSortedEntries(
-        buildCountMap(resources || [], (item) => item.subject || "Unknown"),
-      )
-        .slice(0, 5)
-        .map(([name, value]) => ({ name, views: value })),
-    [resources],
-  );
-
   const keyMetrics = [
     {
-      title: "Total Content",
-      value: formatCompactNumber(summary.total_resources + summary.total_events),
-      trend: `${summary.published_resources + summary.published_events} live`,
-      icon: UploadCloud,
+      title: "Image files",
+      value: formatCompactNumber(photoResources.length),
+      trend: `${getPublishedItems(photoResources).length} published`,
+      icon: ImagePlus,
+      color: "text-sky-600",
+      bg: "bg-sky-50",
+    },
+    {
+      title: "Files",
+      value: formatCompactNumber(fileResources.length),
+      trend: `${getPublishedItems(fileResources).length} published`,
+      icon: FileText,
       color: "text-primary-600",
       bg: "bg-primary-50",
     },
     {
-      title: "Publish Rate",
-      value: `${summary.total_resources ? Math.round((summary.published_resources / summary.total_resources) * 100) : 0}%`,
-      trend: "resources",
-      icon: TrendingUp,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-    },
-    {
-      title: "Event Publish Rate",
-      value: `${summary.total_events ? Math.round((summary.published_events / summary.total_events) * 100) : 0}%`,
-      trend: "events",
-      icon: MousePointerClick,
+      title: "Audio",
+      value: formatCompactNumber(audioResources.length),
+      trend: "Literature story files",
+      icon: Headphones,
       color: "text-indigo-600",
       bg: "bg-indigo-50",
     },
     {
-      title: "Documents",
-      value: formatCompactNumber(summary.total_documents),
-      trend: `${summary.total_audio} audio`,
-      icon: FileText,
+      title: "Event Videos",
+      value: formatCompactNumber(health.videoEvents.length),
+      trend: `${summary.published_events} published`,
+      icon: Video,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
     },
@@ -145,32 +152,28 @@ export default function AnalyticsPage({
       >
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-            Analytics
+            Catalog analytics
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Track your resource library and publishing performance.
+            Measure the catalog using the same categories and filters students use.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-soft">
           <Calendar size={16} className="text-slate-400" />
-          <select className="cursor-pointer bg-transparent text-sm font-medium text-slate-700 outline-none">
-            <option>Last 7 Days</option>
-            <option>Last 30 Days</option>
-            <option>All Time</option>
-          </select>
+          <span className="text-sm font-medium text-slate-700">Live Neon snapshot</span>
         </div>
       </Motion.div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {keyMetrics.map((metric, index) => (
           <Motion.div key={metric.title} variants={itemVariants}>
-            <Card animate delay={index * 0.04} className="flex items-center gap-4 p-5">
+            <Card animate delay={index * 0.04} className="flex h-full items-center gap-4 p-5">
               <div className={`rounded-lg p-3 ${metric.bg}`}>
                 <metric.icon size={20} className={metric.color} />
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-500">{metric.title}</p>
-                <div className="flex items-baseline gap-2">
+                <div className="flex flex-wrap items-baseline gap-2">
                   <h3 className="text-xl font-bold text-slate-900">{metric.value}</h3>
                   <span className="rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
                     {metric.trend}
@@ -186,8 +189,8 @@ export default function AnalyticsPage({
         <Motion.div variants={itemVariants} className="lg:col-span-2">
           <Card className="h-full">
             <div className="mb-6">
-              <h3 className="text-lg font-semibold text-slate-900">Recent Creation Trend</h3>
-              <p className="text-sm text-slate-500">Resources vs events created over the last 7 days</p>
+              <h3 className="text-lg font-semibold text-slate-900">Creation Trend</h3>
+              <p className="text-sm text-slate-500">Resources and event videos created over the last 7 days</p>
             </div>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -235,7 +238,7 @@ export default function AnalyticsPage({
                   <Area
                     type="monotone"
                     dataKey="events"
-                    name="Events"
+                    name="Event videos"
                     stroke="#22c55e"
                     strokeWidth={2}
                     fill="url(#analyticsEvents)"
@@ -249,24 +252,24 @@ export default function AnalyticsPage({
         <Motion.div variants={itemVariants}>
           <Card className="flex h-full flex-col">
             <div className="mb-2">
-              <h3 className="text-lg font-semibold text-slate-900">Content Distribution</h3>
-              <p className="text-sm text-slate-500">Library split by content type</p>
+              <h3 className="text-lg font-semibold text-slate-900">Category Distribution</h3>
+              <p className="text-sm text-slate-500">Study files by required category</p>
             </div>
             <div className="min-h-[250px] flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={typeData}
+                    data={categoryData}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
-                    outerRadius={80}
+                    outerRadius={82}
                     paddingAngle={2}
                     dataKey="value"
                     stroke="none"
                   >
-                    {typeData.map((entry, index) => (
-                      <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                    {categoryData.map((entry, index) => (
+                      <Cell key={entry.id} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
@@ -285,14 +288,20 @@ export default function AnalyticsPage({
 
         <Motion.div variants={itemVariants} className="lg:col-span-3">
           <Card>
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-slate-900">Top Subjects</h3>
-              <p className="text-sm text-slate-500">Most uploaded subjects in your resource library</p>
+            <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Grade Coverage</h3>
+                <p className="text-sm text-slate-500">Study resources and Khmer audio by grade</p>
+              </div>
+              <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600">
+                <TrendingUp size={16} className="text-slate-400" />
+                Grades 9-12
+              </span>
             </div>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={subjectData}
+                  data={gradeData}
                   margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                   barSize={32}
                 >
@@ -311,9 +320,75 @@ export default function AnalyticsPage({
                     tick={{ fill: "#64748b", fontSize: 12 }}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="views" name="Uploads" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
+                  <Bar dataKey="resources" name="Study resources" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="audio" name="Khmer audio" fill="#818cf8" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </Card>
+        </Motion.div>
+
+        <Motion.div variants={itemVariants} className="lg:col-span-2">
+          <Card>
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-slate-900">Top Subjects</h3>
+              <p className="text-sm text-slate-500">Most uploaded subjects in the study resource library</p>
+            </div>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={subjectData}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                  barSize={28}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#64748b", fontSize: 12 }}
+                    dy={10}
+                    interval={0}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                    tick={{ fill: "#64748b", fontSize: 12 }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="uploads" name="Uploads" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </Motion.div>
+
+        <Motion.div variants={itemVariants}>
+          <Card>
+            <h3 className="text-lg font-semibold text-slate-900">Missing Category Attention</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Categories with zero files should be uploaded first so filters never feel empty.
+            </p>
+            <div className="mt-5 space-y-3">
+              {categoryCoverageData.map((category) => (
+                <div
+                  key={category.id}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2"
+                >
+                  <span className="text-sm font-medium text-slate-700">{category.labelEn}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      category.value > 0
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {category.value > 0 ? `${category.value} files` : "empty"}
+                  </span>
+                </div>
+              ))}
             </div>
           </Card>
         </Motion.div>

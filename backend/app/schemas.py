@@ -20,6 +20,8 @@ class ResourceCreate(ResourceBase):
     thumbnail_path: Optional[str] = None
     original_filename: Optional[str] = None
     telegram_file_id: Optional[str] = None
+    cloudinary_public_id: Optional[str] = None
+    cloudinary_resource_type: Optional[str] = None
 
 
 class ResourceUpdate(BaseModel):
@@ -34,6 +36,8 @@ class ResourceUpdate(BaseModel):
     thumbnail_path: Optional[str] = None
     original_filename: Optional[str] = None
     telegram_file_id: Optional[str] = None
+    cloudinary_public_id: Optional[str] = None
+    cloudinary_resource_type: Optional[str] = None
     is_published: Optional[bool] = None
 
 
@@ -43,6 +47,8 @@ class ResourceResponse(ResourceBase):
     thumbnail_path: Optional[str] = None
     original_filename: Optional[str] = None
     telegram_file_id: Optional[str] = None
+    cloudinary_public_id: Optional[str] = None
+    cloudinary_resource_type: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     
@@ -56,6 +62,7 @@ class EventBase(BaseModel):
     status: str = "coming_soon"
     location: Optional[str] = None
     event_date: Optional[datetime] = None
+    media_type: Optional[str] = "video"
     cta_label: Optional[str] = None
     cta_url: Optional[str] = None
     is_published: bool = True
@@ -63,6 +70,9 @@ class EventBase(BaseModel):
 
 class EventCreate(EventBase):
     image_path: Optional[str] = None
+    media_path: Optional[str] = None
+    cloudinary_public_id: Optional[str] = None
+    cloudinary_resource_type: Optional[str] = None
 
 
 class EventUpdate(BaseModel):
@@ -72,6 +82,10 @@ class EventUpdate(BaseModel):
     location: Optional[str] = None
     event_date: Optional[datetime] = None
     image_path: Optional[str] = None
+    media_path: Optional[str] = None
+    media_type: Optional[str] = None
+    cloudinary_public_id: Optional[str] = None
+    cloudinary_resource_type: Optional[str] = None
     cta_label: Optional[str] = None
     cta_url: Optional[str] = None
     is_published: Optional[bool] = None
@@ -80,6 +94,9 @@ class EventUpdate(BaseModel):
 class EventResponse(EventBase):
     id: int
     image_path: Optional[str] = None
+    media_path: Optional[str] = None
+    cloudinary_public_id: Optional[str] = None
+    cloudinary_resource_type: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -95,3 +112,23 @@ class AdminStatsResponse(BaseModel):
     published_resources: int
     total_events: int
     published_events: int
+
+
+class AdminLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    role: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class AuthResponse(BaseModel):
+    user: UserResponse

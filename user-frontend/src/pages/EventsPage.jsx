@@ -37,7 +37,9 @@ function getStatusLabel(status = "", language = "km") {
     completed: language === "km" ? "បានបញ្ចប់" : "Completed",
   };
 
-  return labels[status] || status || (language === "km" ? "ព្រឹត្តិការណ៍" : "Event");
+  return (
+    labels[status] || status || (language === "km" ? "ព្រឹត្តិការណ៍" : "Event")
+  );
 }
 
 export default function EventsPage({ language = "km" }) {
@@ -106,8 +108,8 @@ export default function EventsPage({ language = "km" }) {
 
                 <p className="mt-4 max-w-3xl text-base leading-8 text-black/65 md:text-lg">
                   {isKhmer
-                    ? "ទំព័រនេះបង្ហាញព្រឹត្តិការណ៍ coming soon ទាំងអស់ដែលត្រូវបានបន្ថែមពី admin dashboard ដើម្បីឱ្យសិស្សឃើញកាលបរិច្ឆេទ ទីតាំង និងតំណចុះឈ្មោះបានងាយ។"
-                    : "This page shows every coming-soon event published from the admin dashboard, with dates, locations, and registration links in one clear place."}
+                    ? "ទំព័រនេះបង្ហាញវីដេអូព្រឹត្តិការណ៍ និងព័ត៌មានដែលត្រូវបានបន្ថែមពី admin dashboard ដើម្បីឱ្យសិស្សឃើញកាលបរិច្ឆេទ ទីតាំង និងតំណចុះឈ្មោះបានងាយ។"
+                    : "This page shows event videos and details published from the admin dashboard, with dates, locations, and registration links in one clear place."}
                 </p>
               </div>
 
@@ -181,71 +183,85 @@ export default function EventsPage({ language = "km" }) {
 
             {!loading && !hasError && events.length ? (
               <div className="grid gap-5 lg:grid-cols-2">
-                {events.map((event) => (
-                  <article
-                    key={event.id}
-                    className="overflow-hidden rounded-[1.75rem] border border-black/10 bg-white shadow-[0_14px_38px_rgba(15,23,42,0.06)]"
-                  >
-                    <div className="relative aspect-[16/9] overflow-hidden bg-[#e5e7eb]">
-                      {event.image_path ? (
-                        <img
-                          src={resolveFileUrl(event.image_path)}
-                          alt={event.title}
-                          decoding="async"
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.9),transparent_42%),linear-gradient(135deg,#dbeafe,#e2e8f0)] text-sm font-semibold uppercase tracking-[0.28em] text-black/45">
-                          Event preview
+                {events.map((event) => {
+                  const mediaPath = event.media_path || event.image_path;
+                  const isVideo = event.media_type === "video";
+
+                  return (
+                    <article
+                      key={event.id}
+                      className="overflow-hidden rounded-[1.75rem] border border-black/10 bg-white shadow-[0_14px_38px_rgba(15,23,42,0.06)]"
+                    >
+                      <div className="relative aspect-[16/9] overflow-hidden bg-[#e5e7eb]">
+                        {mediaPath ? (
+                          isVideo ? (
+                            <video
+                              src={resolveFileUrl(mediaPath)}
+                              className="h-full w-full bg-black object-cover"
+                              controls
+                              preload="metadata"
+                            />
+                          ) : (
+                            <img
+                              src={resolveFileUrl(mediaPath)}
+                              alt={event.title}
+                              decoding="async"
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                            />
+                          )
+                        ) : (
+                          <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.9),transparent_42%),linear-gradient(135deg,#dbeafe,#e2e8f0)] text-sm font-semibold uppercase tracking-[0.28em] text-black/45">
+                            Event video
+                          </div>
+                        )}
+                        <div className="absolute left-4 top-4 rounded-full bg-black px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white shadow-sm">
+                          {getStatusLabel(event.status, language)}
                         </div>
-                      )}
-                      <div className="absolute left-4 top-4 rounded-full bg-black px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white shadow-sm">
-                        {getStatusLabel(event.status, language)}
                       </div>
-                    </div>
 
-                    <div className="p-5 md:p-6">
-                      <h2 className="text-2xl font-bold tracking-[-0.03em] text-black">
-                        {event.title}
-                      </h2>
-                      <p className="mt-3 text-sm leading-7 text-black/65 md:text-[15px]">
-                        {event.description ||
-                          (isKhmer
-                            ? "ព័ត៌មានបន្ថែមនឹងបង្ហាញនៅទីនេះ។"
-                            : "More event information will appear here.")}
-                      </p>
-
-                      <div className="mt-5 grid gap-3 text-sm text-black/62">
-                        <div className="inline-flex items-center gap-2">
-                          <CalendarDays className="h-4 w-4" />
-                          {formatEventDate(event.event_date, language)}
-                        </div>
-                        <div className="inline-flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          {event.location ||
+                      <div className="p-5 md:p-6">
+                        <h2 className="text-2xl font-bold tracking-[-0.03em] text-black">
+                          {event.title}
+                        </h2>
+                        <p className="mt-3 text-sm leading-7 text-black/65 md:text-[15px]">
+                          {event.description ||
                             (isKhmer
-                              ? "ទីតាំងនឹងប្រកាសនៅពេលក្រោយ"
-                              : "Location coming soon")}
-                        </div>
-                      </div>
+                              ? "ព័ត៌មានបន្ថែមនឹងបង្ហាញនៅទីនេះ។"
+                              : "More event information will appear here.")}
+                        </p>
 
-                      {event.cta_url ? (
-                        <div className="mt-5">
-                          <a
-                            href={event.cta_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center justify-center rounded-full border border-black px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-black hover:text-white"
-                          >
-                            {event.cta_label ||
-                              (isKhmer ? "មើលព័ត៌មានបន្ថែម" : "Learn more")}
-                          </a>
+                        <div className="mt-5 grid gap-3 text-sm text-black/62">
+                          <div className="inline-flex items-center gap-2">
+                            <CalendarDays className="h-4 w-4" />
+                            {formatEventDate(event.event_date, language)}
+                          </div>
+                          <div className="inline-flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            {event.location ||
+                              (isKhmer
+                                ? "ទីតាំងនឹងប្រកាសនៅពេលក្រោយ"
+                                : "Location coming soon")}
+                          </div>
                         </div>
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
+
+                        {event.cta_url ? (
+                          <div className="mt-5">
+                            <a
+                              href={event.cta_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center justify-center rounded-full border border-black px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-black hover:text-white"
+                            >
+                              {event.cta_label ||
+                                (isKhmer ? "មើលព័ត៌មានបន្ថែម" : "Learn more")}
+                            </a>
+                          </div>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             ) : null}
           </div>

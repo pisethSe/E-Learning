@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Bell,
+  BookOpen,
   Camera,
   Check,
   HardDrive,
@@ -12,6 +13,12 @@ import {
 import { motion as Motion } from "framer-motion";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import {
+  AUDIO_SUBJECT,
+  GRADE_OPTIONS,
+  RESOURCE_CATEGORIES,
+  SUBJECTS_BY_GRADE,
+} from "../data/learningCatalog";
 import { getSummary } from "../utils/dashboard";
 
 function Toggle({ enabled, onChange, colorClass = "bg-primary-600" }) {
@@ -62,7 +69,7 @@ export default function SettingsPage({
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Settings</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Manage your workspace preferences and admin details.
+            Review workspace details and the catalog rules used by admin uploads.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -87,8 +94,9 @@ export default function SettingsPage({
           <nav className="sticky top-28 space-y-1">
             {[
               { name: "Profile", icon: User, active: true },
-              { name: "Notifications", icon: Bell, active: false },
+              { name: "Catalog Rules", icon: BookOpen, active: false },
               { name: "Storage", icon: HardDrive, active: false },
+              { name: "Notifications", icon: Bell, active: false },
               { name: "Appearance", icon: Palette, active: false },
               { name: "Security", icon: Shield, active: false },
             ].map((item) => (
@@ -226,7 +234,7 @@ export default function SettingsPage({
                   {summary.total_events}
                 </p>
                 <p className="mt-2 text-xs text-slate-500">
-                  {summary.published_events} published events
+                  {summary.published_events} published event videos
                 </p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -234,6 +242,61 @@ export default function SettingsPage({
                 <p className="mt-1 text-sm font-semibold text-slate-900">/uploads</p>
                 <p className="mt-2 text-xs text-slate-500">
                   Public assets served from the backend.
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
+              <BookOpen size={18} className="text-primary-600" />
+              <h3 className="text-lg font-semibold text-slate-900">Catalog Rules</h3>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-900">Grades</p>
+                <p className="mt-2 text-sm text-slate-500">
+                  Admin resources are limited to Grades {GRADE_OPTIONS.join(", ")}.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {GRADE_OPTIONS.map((grade) => (
+                    <span
+                      key={grade}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
+                    >
+                      Grade {grade}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-900">Audio Rule</p>
+                <p className="mt-2 text-sm text-slate-500">
+                  Audio uploads are locked to {AUDIO_SUBJECT} / អក្សរសាស្ត្រខ្មែរ.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+                <p className="text-sm font-semibold text-slate-900">Required Resource Categories</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                  {RESOURCE_CATEGORIES.map((category) => (
+                    <div
+                      key={category.value}
+                      className="rounded-lg border border-slate-200 bg-white p-3"
+                    >
+                      <p className="text-sm font-semibold text-slate-900">{category.labelKm}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">{category.labelEn}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+                <p className="text-sm font-semibold text-slate-900">Grade 12 Bac II Subjects</p>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  {SUBJECTS_BY_GRADE[12].join(", ")}
                 </p>
               </div>
             </div>
@@ -275,14 +338,14 @@ export default function SettingsPage({
             </div>
           </Card>
 
-          <Card className="border-red-200 bg-red-50/50">
-            <h3 className="text-lg font-semibold text-red-700">Danger Zone</h3>
-            <p className="mb-4 mt-2 text-sm text-red-600/80">
-              This panel is for sensitive actions. Keep destructive operations behind extra confirmation.
+          <Card className="border-slate-200 bg-slate-50/70">
+            <h3 className="text-lg font-semibold text-slate-900">Safe Operations</h3>
+            <p className="mb-4 mt-2 text-sm text-slate-600">
+              Deleting uploaded content still requires confirmation from the resource or event list.
             </p>
-            <Button variant="danger" size="sm">
+            <Button variant="outline" size="sm" disabled>
               <Trash2 size={16} className="mr-2" />
-              Delete Account
+              Protected
             </Button>
           </Card>
         </div>

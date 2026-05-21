@@ -8,7 +8,7 @@ export function Button({
   ...props
 }) {
   const baseClasses =
-    "inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+    "inline-flex items-center justify-center rounded-lg font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
 
   const variants = {
     primary:
@@ -16,7 +16,7 @@ export function Button({
     secondary:
       "bg-slate-800 text-white hover:bg-slate-900 focus:ring-slate-800",
     outline:
-      "border border-slate-300 text-slate-700 hover:bg-slate-50 focus:ring-primary-500",
+      "border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 focus:ring-primary-500",
     ghost:
       "text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:ring-slate-200",
     danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-600",

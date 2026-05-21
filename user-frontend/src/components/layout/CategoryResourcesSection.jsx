@@ -12,6 +12,14 @@ import {
   resolveFileUrl,
   resolveResourceUrl,
 } from "@/services/api";
+import {
+  GRADE_OPTIONS,
+  RESOURCE_CATEGORIES,
+  extractKhmerText,
+  getSubjectLabel,
+  inferResourceCategory,
+  normalizeText,
+} from "@/data/learningCatalog";
 
 const khmerCollator = new Intl.Collator("km", {
   numeric: true,
@@ -50,111 +58,7 @@ const panelTextureStyle = {
   backgroundSize: "24px 24px",
 };
 
-const CATEGORY_DEFINITIONS = [
-  {
-    id: "exam",
-    labelKm: "វិញ្ញាសា",
-    labelEn: "Exam Papers",
-    accent: "from-[#1f2937] via-[#334155] to-[#94a3b8]",
-    keywords: ["កំណែវិញ្ញាសា", "វិញ្ញាសា", "exam", "test", "paper", "bac"],
-  },
-  {
-    id: "exercise",
-    labelKm: "លំហាត់",
-    labelEn: "Exercises",
-    accent: "from-[#1f3b2d] via-[#365845] to-[#a5c3b1]",
-    keywords: ["លំហាត់", "exercise", "worksheet", "practice", "homework"],
-  },
-  {
-    id: "formula",
-    labelKm: "រូបមន្ត",
-    labelEn: "Formulas",
-    accent: "from-[#4c3a28] via-[#8a6b49] to-[#d7c2a4]",
-    keywords: ["រូបមន្ត", "formula", "summary", "cheat sheet"],
-  },
-  {
-    id: "answer",
-    labelKm: "កំណែរលំហាត់",
-    labelEn: "Answer Keys",
-    accent: "from-[#4c2832] via-[#805364] to-[#dcb6c0]",
-    keywords: [
-      "កំណែរលំហាត់",
-      "កំណែលំហាត់",
-      "កំណែ",
-      "ចម្លើយ",
-      "answer",
-      "answer key",
-      "solution",
-      "solved",
-    ],
-  },
-];
-
-const CATEGORY_BY_ID = CATEGORY_DEFINITIONS.reduce((accumulator, category) => {
-  accumulator[category.id] = category;
-  return accumulator;
-}, {});
-
-const SUBJECT_LABELS = {
-  Mathematics: "គណិតវិទ្យា",
-  Physics: "រូបវិទ្យា",
-  Chemistry: "គីមីវិទ្យា",
-  Biology: "ជីវវិទ្យា",
-  "Khmer Literature": "អក្សរសាស្ត្រខ្មែរ",
-  History: "ប្រវត្តិវិទ្យា",
-  Geography: "ភូមិវិទ្យា",
-  English: "ភាសាអង់គ្លេស",
-};
-
-const GRADE_OPTIONS = [9, 10, 11, 12];
-
-function extractKhmerText(value = "") {
-  return (
-    String(value)
-      .match(/[\u1780-\u17FF\s\d]+/g)
-      ?.join(" ")
-      .trim() || ""
-  );
-}
-
-function normalizeText(value = "") {
-  return String(value).toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-function detectCategory(resource) {
-  const explicitCategoryKey = normalizeText(resource.category || "").replace(
-    /[\s-]+/g,
-    "_",
-  );
-  if (explicitCategoryKey && CATEGORY_BY_ID[explicitCategoryKey]) {
-    return CATEGORY_BY_ID[explicitCategoryKey];
-  }
-
-  const haystack = normalizeText(
-    [
-      resource.title,
-      resource.description,
-      resource.file_type,
-      extractKhmerText(resource.title),
-      extractKhmerText(resource.description),
-    ].join(" "),
-  );
-
-  const orderedDefinitions = [
-    CATEGORY_DEFINITIONS[3],
-    CATEGORY_DEFINITIONS[0],
-    CATEGORY_DEFINITIONS[1],
-    CATEGORY_DEFINITIONS[2],
-  ];
-
-  return (
-    orderedDefinitions.find((definition) =>
-      definition.keywords.some((keyword) =>
-        haystack.includes(normalizeText(keyword)),
-      ),
-    ) || null
-  );
-}
+const CATEGORY_DEFINITIONS = RESOURCE_CATEGORIES;
 
 function formatCreatedAt(value) {
   if (!value) {
@@ -171,14 +75,6 @@ function formatCreatedAt(value) {
     month: "long",
     year: "numeric",
   }).format(date);
-}
-
-function getSubjectLabel(subject = "", language = "km") {
-  if (language !== "km") {
-    return subject;
-  }
-
-  return SUBJECT_LABELS[subject] || extractKhmerText(subject) || subject;
 }
 
 function buildSearchIndex(item) {
@@ -202,7 +98,7 @@ function buildSearchIndex(item) {
 }
 
 function toDisplayResource(resource, language = "km") {
-  const category = detectCategory(resource);
+  const category = inferResourceCategory(resource);
 
   if (!category) {
     return null;
@@ -290,6 +186,7 @@ export default function CategoryResourcesSection({ language = "km" }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedGrade, setSelectedGrade] = useState("all");
+  const [selectedSubject, setSelectedSubject] = useState("all");
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -356,12 +253,19 @@ export default function CategoryResourcesSection({ language = "km" }) {
     );
   }, [preparedResources]);
 
+  const subjectOptions = useMemo(() => {
+    return [...new Set(preparedResources.map((resource) => resource.subject))]
+      .filter(Boolean)
+      .sort((left, right) => khmerCollator.compare(left, right));
+  }, [preparedResources]);
+
   const activeCategoryDefinition =
     CATEGORY_DEFINITIONS.find((category) => category.id === selectedCategory) ||
     null;
   const hasActiveFilters =
     selectedCategory !== "all" ||
     selectedGrade !== "all" ||
+    selectedSubject !== "all" ||
     searchQuery.trim().length > 0;
 
   const handleCategorySelect = (categoryId) => {
@@ -374,6 +278,7 @@ export default function CategoryResourcesSection({ language = "km" }) {
     setSearchQuery("");
     setSelectedCategory("all");
     setSelectedGrade("all");
+    setSelectedSubject("all");
   };
 
   const filteredResources = useMemo(() => {
@@ -385,11 +290,13 @@ export default function CategoryResourcesSection({ language = "km" }) {
       const matchesGrade =
         selectedGrade === "all" ||
         Number(resource.grade_level) === Number(selectedGrade);
+      const matchesSubject =
+        selectedSubject === "all" || resource.subject === selectedSubject;
       const matchesQuery =
         !normalizedQuery ||
         buildSearchIndex(resource).includes(normalizedQuery);
 
-      return matchesCategory && matchesGrade && matchesQuery;
+      return matchesCategory && matchesGrade && matchesSubject && matchesQuery;
     });
 
     nextResources.sort((left, right) => {
@@ -403,7 +310,13 @@ export default function CategoryResourcesSection({ language = "km" }) {
     });
 
     return nextResources;
-  }, [preparedResources, searchQuery, selectedCategory, selectedGrade]);
+  }, [
+    preparedResources,
+    searchQuery,
+    selectedCategory,
+    selectedGrade,
+    selectedSubject,
+  ]);
 
   return (
     <section
@@ -523,6 +436,23 @@ export default function CategoryResourcesSection({ language = "km" }) {
                   </select>
                 </label>
 
+                <label className="relative block w-full sm:w-[240px]">
+                  <select
+                    value={selectedSubject}
+                    onChange={(event) => setSelectedSubject(event.target.value)}
+                    className="h-11 w-full appearance-none rounded-full border border-black/10 bg-white px-4 text-sm text-black outline-none transition-colors focus:border-black/25"
+                  >
+                    <option value="all">
+                      {isKhmer ? "មុខវិជ្ជាទាំងអស់" : "All subjects"}
+                    </option>
+                    {subjectOptions.map((subject) => (
+                      <option key={subject} value={subject}>
+                        {getSubjectLabel(subject, language)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
                 {hasActiveFilters ? (
                   <button
                     type="button"
@@ -546,7 +476,7 @@ export default function CategoryResourcesSection({ language = "km" }) {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               {CATEGORY_DEFINITIONS.map((category) => (
                 <button
                   key={category.id}

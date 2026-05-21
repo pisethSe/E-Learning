@@ -19,7 +19,9 @@ async function parseResponse(response) {
         ? payload.detail || payload.message
         : payload;
 
-    throw new Error(detail || `Request failed with status ${response.status}`);
+    const error = new Error(detail || `Request failed with status ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   return payload;
@@ -27,7 +29,13 @@ async function parseResponse(response) {
 
 async function request(path, options = {}) {
   try {
-    const response = await fetch(buildUrl(path), options);
+    const response = await fetch(buildUrl(path), {
+      credentials: "include",
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+      },
+    });
     return parseResponse(response);
   } catch (error) {
     if (error instanceof Error && error.name === "TypeError") {
@@ -64,6 +72,26 @@ export function resolveAssetUrl(filePath) {
 
   const normalizedPath = filePath.startsWith("/") ? filePath : `/${filePath}`;
   return `${API_BASE_URL}${normalizedPath}`;
+}
+
+export function loginAdmin(credentials) {
+  return request("/api/auth/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(credentials),
+  });
+}
+
+export function fetchCurrentAdmin() {
+  return request("/api/auth/me");
+}
+
+export function logoutAdmin() {
+  return request("/api/auth/logout", {
+    method: "POST",
+  });
 }
 
 export function fetchAdminStats() {
@@ -123,8 +151,8 @@ export async function saveAdminEvent(payload) {
   appendValue(formData, "cta_url", payload.cta_url);
   appendValue(formData, "is_published", payload.is_published);
 
-  if (payload.image instanceof File) {
-    formData.append("image", payload.image);
+  if (payload.media instanceof File) {
+    formData.append("media", payload.media);
   }
 
   const path = payload.id

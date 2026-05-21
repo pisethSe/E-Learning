@@ -1,10 +1,14 @@
 import mimetypes
+import os
 import re
 import secrets
 import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Optional
 
+from fastapi import HTTPException
 from telegram import Bot
 
 try:
@@ -17,12 +21,33 @@ UPLOADS_DIR = BASE_DIR / "uploads"
 RESOURCE_UPLOADS_DIR = UPLOADS_DIR / "resources"
 EVENT_UPLOADS_DIR = UPLOADS_DIR / "events"
 THUMBNAILS_DIR = UPLOADS_DIR / "thumbnails"
+CLOUDINARY_DEFAULT_FOLDER = "e-learning-grade-a"
+CLOUDINARY_LARGE_UPLOAD_THRESHOLD = 95 * 1024 * 1024
+CLOUDINARY_LARGE_UPLOAD_CHUNK_SIZE = 20 * 1024 * 1024
 
 
 def ensure_storage_dirs():
     RESOURCE_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def get_storage_backend() -> str:
+    configured_backend = os.getenv("STORAGE_BACKEND", "").strip().lower()
+    if configured_backend:
+        return configured_backend
+
+    cloudinary_credentials = [
+        os.getenv("CLOUDINARY_URL"),
+        os.getenv("CLOUDINARY_CLOUD_NAME"),
+        os.getenv("CLOUDINARY_API_KEY"),
+        os.getenv("CLOUDINARY_API_SECRET"),
+    ]
+    return "cloudinary" if any(cloudinary_credentials) else "local"
+
+
+def using_cloudinary_storage() -> bool:
+    return get_storage_backend() == "cloudinary"
 
 
 def sanitize_filename(filename: str) -> str:
@@ -66,11 +91,191 @@ def is_image_path(value: Optional[str]) -> bool:
     return Path(value or "").suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 
+def is_video_path(value: Optional[str]) -> bool:
+    return Path(value or "").suffix.lower() in {".mp4", ".webm", ".mov", ".m4v", ".ogg"}
+
+
+def is_audio_path(value: Optional[str]) -> bool:
+    return Path(value or "").suffix.lower() in {".mp3", ".wav", ".m4a", ".aac", ".ogg"}
+
+
+def get_cloudinary_folder(destination_dir: Path) -> str:
+    base_folder = os.getenv("CLOUDINARY_UPLOAD_FOLDER", CLOUDINARY_DEFAULT_FOLDER).strip("/")
+    if destination_dir == EVENT_UPLOADS_DIR:
+        return f"{base_folder}/events"
+    return f"{base_folder}/resources"
+
+
+def get_cloudinary_resource_type(
+    *,
+    filename: Optional[str] = None,
+    content_type: Optional[str] = None,
+    file_type_hint: Optional[str] = None,
+) -> str:
+    hint = (file_type_hint or "").strip().lower()
+    normalized_content_type = (content_type or "").lower()
+
+    if hint == "audio" or normalized_content_type.startswith("audio/") or is_audio_path(filename):
+        return "video"
+    if hint == "video" or normalized_content_type.startswith("video/") or is_video_path(filename):
+        return "video"
+    if hint == "image" or normalized_content_type.startswith("image/") or is_image_path(filename):
+        return "image"
+
+    return "raw"
+
+
+def configure_cloudinary():
+    try:
+        import cloudinary
+    except ImportError as exc:  # pragma: no cover - dependency/runtime configuration
+        raise HTTPException(
+            status_code=500,
+            detail="Cloudinary storage is enabled, but the cloudinary Python package is not installed.",
+        ) from exc
+
+    if os.getenv("CLOUDINARY_URL"):
+        cloudinary.config(secure=True)
+        return
+
+    missing_keys = [
+        key
+        for key in [
+            "CLOUDINARY_CLOUD_NAME",
+            "CLOUDINARY_API_KEY",
+            "CLOUDINARY_API_SECRET",
+        ]
+        if not os.getenv(key)
+    ]
+
+    if missing_keys:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Cloudinary storage is enabled, but {', '.join(missing_keys)} is not configured.",
+        )
+
+    cloudinary.config(
+        cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+        api_key=os.getenv("CLOUDINARY_API_KEY"),
+        api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+        secure=True,
+    )
+
+
+def upload_path_to_cloudinary(
+    *,
+    local_file_path: Path,
+    original_name: str,
+    destination_dir: Path,
+    file_type_hint: Optional[str] = None,
+    content_type: Optional[str] = None,
+):
+    configure_cloudinary()
+
+    import cloudinary.uploader
+
+    resource_type = get_cloudinary_resource_type(
+        filename=original_name,
+        content_type=content_type,
+        file_type_hint=file_type_hint,
+    )
+
+    if (
+        resource_type == "video"
+        and (file_type_hint or "").strip().lower() == "audio"
+        and local_file_path.stat().st_size >= CLOUDINARY_LARGE_UPLOAD_THRESHOLD
+    ):
+        local_file_path = compress_audio_for_cloudinary(local_file_path)
+
+    upload_options = {
+        "folder": get_cloudinary_folder(destination_dir),
+        "resource_type": resource_type,
+        "use_filename": True,
+        "unique_filename": True,
+        "overwrite": False,
+    }
+
+    try:
+        if local_file_path.stat().st_size >= CLOUDINARY_LARGE_UPLOAD_THRESHOLD:
+            upload_result = cloudinary.uploader.upload_large(
+                str(local_file_path),
+                chunk_size=CLOUDINARY_LARGE_UPLOAD_CHUNK_SIZE,
+                **upload_options,
+            )
+        else:
+            upload_result = cloudinary.uploader.upload(
+                str(local_file_path),
+                **upload_options,
+            )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Cloudinary upload failed: {exc}",
+        ) from exc
+    secure_url = upload_result.get("secure_url") or upload_result.get("url")
+    cloudinary_resource_type = upload_result.get("resource_type") or resource_type
+
+    if not secure_url:
+        raise HTTPException(status_code=502, detail="Cloudinary upload did not return a file URL.")
+
+    return {
+        "file_path": secure_url,
+        "thumbnail_path": secure_url if cloudinary_resource_type == "image" else None,
+        "original_filename": original_name,
+        "cloudinary_public_id": upload_result.get("public_id"),
+        "cloudinary_resource_type": cloudinary_resource_type,
+    }
+
+
+def compress_audio_for_cloudinary(local_file_path: Path) -> Path:
+    try:
+        import imageio_ffmpeg
+    except ImportError as exc:  # pragma: no cover - dependency/runtime configuration
+        raise HTTPException(
+            status_code=500,
+            detail="Audio is too large for Cloudinary and imageio-ffmpeg is not installed for compression.",
+        ) from exc
+
+    compressed_path = local_file_path.with_name(f"{local_file_path.stem}-compressed.m4a")
+    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+    result = subprocess.run(
+        [
+            ffmpeg_path,
+            "-y",
+            "-i",
+            str(local_file_path),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "22050",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "32k",
+            "-movflags",
+            "+faststart",
+            str(compressed_path),
+        ],
+        capture_output=True,
+    )
+
+    if result.returncode != 0 or not compressed_path.exists():
+        stderr = result.stderr[-4000:].decode("utf-8", "replace")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Audio compression failed before Cloudinary upload: {stderr}",
+        )
+
+    return compressed_path
+
+
 def store_upload_file(
     *,
     upload_file,
     destination_dir: Path,
     preferred_name: Optional[str] = None,
+    file_type_hint: Optional[str] = None,
 ):
     ensure_storage_dirs()
 
@@ -78,6 +283,21 @@ def store_upload_file(
     file_extension = guess_extension(original_name, None)
     safe_stem = sanitize_filename(Path(preferred_name or original_name).stem)
     unique_name = f"{safe_stem}-{secrets.token_hex(8)}{file_extension}"
+
+    if using_cloudinary_storage():
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_file_path = Path(temp_dir) / unique_name
+            with local_file_path.open("wb") as buffer:
+                shutil.copyfileobj(upload_file.file, buffer)
+
+            return upload_path_to_cloudinary(
+                local_file_path=local_file_path,
+                original_name=original_name,
+                destination_dir=destination_dir,
+                file_type_hint=file_type_hint,
+                content_type=getattr(upload_file, "content_type", None),
+            )
+
     local_file_path = destination_dir / unique_name
 
     with local_file_path.open("wb") as buffer:
@@ -92,6 +312,8 @@ def store_upload_file(
         "file_path": build_public_path(UPLOADS_DIR, local_file_path),
         "thumbnail_path": thumbnail_public_path,
         "original_filename": original_name,
+        "cloudinary_public_id": None,
+        "cloudinary_resource_type": None,
     }
 
 
@@ -103,6 +325,41 @@ def remove_public_file(public_path: Optional[str]):
     target_path = UPLOADS_DIR / relative_path
     if target_path.exists() and target_path.is_file():
         target_path.unlink()
+
+
+def remove_cloudinary_file(
+    *,
+    public_id: Optional[str],
+    resource_type: Optional[str],
+):
+    if not public_id:
+        return
+
+    configure_cloudinary()
+
+    import cloudinary.uploader
+
+    cloudinary.uploader.destroy(
+        public_id,
+        resource_type=resource_type or "image",
+        invalidate=True,
+    )
+
+
+def remove_stored_file(
+    public_path: Optional[str],
+    *,
+    cloudinary_public_id: Optional[str] = None,
+    cloudinary_resource_type: Optional[str] = None,
+):
+    if cloudinary_public_id:
+        remove_cloudinary_file(
+            public_id=cloudinary_public_id,
+            resource_type=cloudinary_resource_type,
+        )
+        return
+
+    remove_public_file(public_path)
 
 
 async def download_telegram_file_to_storage(
@@ -124,6 +381,18 @@ async def download_telegram_file_to_storage(
     local_file_path = RESOURCE_UPLOADS_DIR / unique_name
     await telegram_file.download_to_drive(custom_path=str(local_file_path))
 
+    if using_cloudinary_storage():
+        try:
+            return upload_path_to_cloudinary(
+                local_file_path=local_file_path,
+                original_name=original_name,
+                destination_dir=RESOURCE_UPLOADS_DIR,
+                file_type_hint=None,
+            )
+        finally:
+            if local_file_path.exists():
+                local_file_path.unlink()
+
     thumbnail_public_path = None
     if file_extension.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
         thumbnail_name = f"{Path(unique_name).stem}-thumb.jpg"
@@ -132,5 +401,8 @@ async def download_telegram_file_to_storage(
     return {
         "file_path": build_public_path(UPLOADS_DIR, local_file_path),
         "thumbnail_path": thumbnail_public_path,
+        "original_filename": original_name,
         "telegram_file_path": telegram_file.file_path,
+        "cloudinary_public_id": None,
+        "cloudinary_resource_type": None,
     }

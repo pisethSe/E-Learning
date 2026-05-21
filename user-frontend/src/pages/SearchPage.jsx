@@ -1,12 +1,25 @@
 import React from "react";
+import ResourceLibraryPage from "@/components/resources/ResourceLibraryPage";
 
-export default function SearchPage({ query = "" }) {
+export default function SearchPage({ query = "", language = "km" }) {
+  const isKhmer = language === "km";
+
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-16 pt-28 sm:pt-32">
-      <h1 className="text-3xl font-bold text-black">Search</h1>
-      <p className="mt-3 text-black/65">
-        {query ? `Showing results for "${query}".` : "Search results will appear here."}
-      </p>
-    </main>
+    <ResourceLibraryPage
+      key={query}
+      language={language}
+      initialQuery={query}
+      eyebrow={isKhmer ? "ស្វែងរក" : "Search"}
+      title={isKhmer ? "ស្វែងរកឯកសារសិក្សា" : "Search Study Resources"}
+      description={
+        query
+          ? isKhmer
+            ? `លទ្ធផលសម្រាប់ "${query}"។ អ្នកអាចបន្ថែមតម្រៀបតាមថ្នាក់ មុខវិជ្ជា និងប្រភេទឯកសារ។`
+            : `Results for "${query}". You can refine by grade, subject, and category.`
+          : isKhmer
+            ? "ស្វែងរកឯកសារតាមចំណងជើង មុខវិជ្ជា ថ្នាក់ ឬប្រភេទឯកសារ។"
+            : "Search by title, subject, grade, or resource category."
+      }
+    />
   );
 }

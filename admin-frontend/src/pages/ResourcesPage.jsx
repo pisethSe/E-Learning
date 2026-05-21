@@ -3,6 +3,7 @@ import ResourceUploadForm from "../components/forms/ResourceUploadForm";
 import ResourceTable from "../components/tables/ResourceTable";
 
 export default function ResourcesPage({
+  mode = "file",
   resources,
   isLoading,
   isSaving,
@@ -25,9 +26,10 @@ export default function ResourcesPage({
   }
 
   return (
-    <section className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[380px,1fr]">
+    <section className="space-y-6">
       <ResourceUploadForm
-        key={editingResource ? `resource-${editingResource.id}` : "resource-new"}
+        key={editingResource ? `resource-${editingResource.id}` : `${mode}-new`}
+        mode={mode}
         resource={editingResource}
         onSubmit={handleSave}
         onCancel={() => setEditingResource(null)}
@@ -35,6 +37,7 @@ export default function ResourcesPage({
       />
 
       <ResourceTable
+        mode={mode}
         resources={resources}
         onEdit={handleEdit}
         onDelete={onDelete}

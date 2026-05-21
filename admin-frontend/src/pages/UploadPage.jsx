@@ -1,7 +1,7 @@
 import React from "react";
 import { AnimatePresence, motion as Motion } from "framer-motion";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { CalendarRange, FileStack, UploadCloud } from "lucide-react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { FileText, Headphones, ImagePlus, UploadCloud, Video } from "lucide-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import EventsPage from "./EventsPage";
@@ -9,22 +9,68 @@ import ResourcesPage from "./ResourcesPage";
 
 const tabs = [
   {
-    id: "resources",
-    label: "Resources",
-    icon: FileStack,
+    id: "photo",
+    label: "Image Files",
+    icon: ImagePlus,
+    color: "text-sky-600",
+    border: "border-sky-200 bg-sky-50/50",
+    button: "bg-sky-600 hover:bg-sky-700",
+    title: "Upload Image Files",
+    copy: "Add scanned pages, diagrams, and image-based study materials. Students see them together with files and can filter by category.",
+    buttonLabel: "Open Image Form",
+  },
+  {
+    id: "file",
+    label: "Files",
+    icon: FileText,
     color: "text-primary-600",
     border: "border-primary-200 bg-primary-50/50",
     button: "bg-primary-600 hover:bg-primary-700",
+    title: "Upload Files",
+    copy: "Add answer keys, formulas, exam papers, documents, presentations, spreadsheets, and e-books.",
+    buttonLabel: "Open File Form",
+  },
+  {
+    id: "audio",
+    label: "Audio",
+    icon: Headphones,
+    color: "text-indigo-600",
+    border: "border-indigo-200 bg-indigo-50/50",
+    button: "bg-indigo-600 hover:bg-indigo-700",
+    title: "Upload Khmer Literature Audio",
+    copy: "Story audio files for Khmer Literature essay writing and revision.",
+    buttonLabel: "Open Audio Form",
   },
   {
     id: "events",
-    label: "Events",
-    icon: CalendarRange,
+    label: "Event Videos",
+    icon: Video,
     color: "text-emerald-600",
     border: "border-emerald-200 bg-emerald-50/50",
     button: "bg-emerald-600 hover:bg-emerald-700",
+    title: "Upload Event Videos",
+    copy: "Publish event videos with dates, locations, and registration links.",
+    buttonLabel: "Open Event Form",
   },
 ];
+
+function resolveUploadTab(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (normalized === "resources" || normalized === "documents" || normalized === "document") {
+    return "file";
+  }
+
+  if (normalized === "image" || normalized === "images") {
+    return "photo";
+  }
+
+  if (tabs.some((tab) => tab.id === normalized)) {
+    return normalized;
+  }
+
+  return "photo";
+}
 
 export default function UploadPage({
   resources,
@@ -38,13 +84,14 @@ export default function UploadPage({
   onDeleteEvent,
 }) {
   const navigate = useNavigate();
+  const { tab } = useParams();
   const [searchParams] = useSearchParams();
-  const activeTab = tabs.find((tab) => tab.id === searchParams.get("tab"))?.id || "resources";
-  const activeTabData = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+  const activeTab = resolveUploadTab(tab || searchParams.get("tab"));
+  const activeTabData = tabs.find((tabItem) => tabItem.id === activeTab) || tabs[0];
   const ActiveIcon = activeTabData.icon;
 
   function handleTabChange(tabId) {
-    navigate(`/upload?tab=${tabId}`);
+    navigate(`/upload/${tabId}`);
   }
 
   return (
@@ -55,7 +102,7 @@ export default function UploadPage({
             Upload Content
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Add new resources or publish student-facing events.
+            Add image files, documents, Khmer Literature audio, and event videos using the same catalog students filter on.
           </p>
         </div>
       </div>
@@ -91,12 +138,10 @@ export default function UploadPage({
           </div>
 
           <h3 className="text-lg font-semibold text-slate-900">
-            {activeTab === "resources" ? "Upload Resource Files" : "Create New Event"}
+            {activeTabData.title}
           </h3>
           <p className="mb-6 mt-2 max-w-md text-sm text-slate-500">
-            {activeTab === "resources"
-              ? "Manage documents, images, audio lessons, and links for the student library."
-              : "Publish upcoming workshops, registration notices, and school announcements."}
+            {activeTabData.copy}
           </p>
 
           <Button
@@ -109,7 +154,7 @@ export default function UploadPage({
             }
           >
             <UploadCloud size={18} className="mr-2" />
-            {activeTab === "resources" ? "Open Resource Form" : "Open Event Form"}
+            {activeTabData.buttonLabel}
           </Button>
         </div>
       </Card>
@@ -122,8 +167,27 @@ export default function UploadPage({
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
         >
-          {activeTab === "resources" ? (
+          {activeTab === "photo" ? (
             <ResourcesPage
+              mode="photo"
+              resources={resources}
+              isLoading={isLoading}
+              isSaving={isSavingResource}
+              onSave={onSaveResource}
+              onDelete={onDeleteResource}
+            />
+          ) : activeTab === "file" ? (
+            <ResourcesPage
+              mode="file"
+              resources={resources}
+              isLoading={isLoading}
+              isSaving={isSavingResource}
+              onSave={onSaveResource}
+              onDelete={onDeleteResource}
+            />
+          ) : activeTab === "audio" ? (
+            <ResourcesPage
+              mode="audio"
               resources={resources}
               isLoading={isLoading}
               isSaving={isSavingResource}

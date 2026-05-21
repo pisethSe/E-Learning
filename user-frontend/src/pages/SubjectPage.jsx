@@ -1,12 +1,22 @@
 import React from "react";
+import ResourceLibraryPage from "@/components/resources/ResourceLibraryPage";
+import { getSubjectLabel } from "@/data/learningCatalog";
 
-export default function SubjectPage({ subject = "Subject" }) {
+export default function SubjectPage({ subject = "Subject", language = "km" }) {
+  const isKhmer = language === "km";
+  const subjectLabel = getSubjectLabel(subject, language);
+
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-16 pt-28 sm:pt-32">
-      <h1 className="text-3xl font-bold text-black">{subject}</h1>
-      <p className="mt-3 text-black/65">
-        Subject-specific resources can be rendered here.
-      </p>
-    </main>
+    <ResourceLibraryPage
+      language={language}
+      fixedSubject={subject}
+      eyebrow={isKhmer ? "រៀបតាមមុខវិជ្ជា" : "Subject resources"}
+      title={subjectLabel}
+      description={
+        isKhmer
+          ? `ឯកសារ ${subjectLabel} សម្រាប់ថ្នាក់ទី ៩ ដល់ ១២។ អាចតម្រៀបតាមថ្នាក់ និងប្រភេទឯកសារដើម្បីរកមេរៀនបានឆាប់។`
+          : `${subject} resources for Grades 9 to 12. Filter by grade and category to find the right material quickly.`
+      }
+    />
   );
 }
