@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
-import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const SERVICES = [
   {
@@ -69,18 +67,6 @@ export default function VerticalTabs({ language = "km" }) {
     setActiveIndex((prev) => (prev + 1) % SERVICES.length);
   }, []);
 
-  const handlePrev = useCallback(() => {
-    setDirection(-1);
-    setActiveIndex((prev) => (prev - 1 + SERVICES.length) % SERVICES.length);
-  }, []);
-
-  const handleTabClick = (index) => {
-    if (index === activeIndex) return;
-    setDirection(index > activeIndex ? 1 : -1);
-    setActiveIndex(index);
-    setIsPaused(false);
-  };
-
   useEffect(() => {
     if (isPaused) return;
 
@@ -112,6 +98,28 @@ export default function VerticalTabs({ language = "km" }) {
   };
 
   const isKhmer = language === "km";
+  const activeTitle = isKhmer ? activeService.title : activeService.titleEn;
+  const activeDescription = isKhmer
+    ? activeService.description
+    : activeService.descriptionEn;
+
+  const textVariants = {
+    enter: (dir) => ({
+      x: dir > 0 ? 34 : -34,
+      opacity: 0,
+      filter: "blur(6px)",
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+      filter: "blur(0px)",
+    },
+    exit: (dir) => ({
+      x: dir > 0 ? -34 : 34,
+      opacity: 0,
+      filter: "blur(6px)",
+    }),
+  };
 
   return (
     <section
@@ -133,104 +141,79 @@ export default function VerticalTabs({ language = "km" }) {
         }}
       />
       <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-7xl items-center px-4 md:px-8 lg:min-h-[calc(100dvh-7rem)] lg:px-10 xl:px-16">
-        <div className="grid w-full grid-cols-1 items-center gap-7 md:gap-9 lg:grid-cols-[0.86fr_1.14fr] lg:gap-12 xl:gap-14">
-          {/* Left Column: Content */}
-          <div className="order-2 flex flex-col justify-center pt-0 lg:order-1 lg:pt-2">
-            <div className="mb-5 space-y-2 md:mb-6">
-              <h2 className="text-balance text-3xl font-bold leading-tight text-black md:text-4xl">
-                {isKhmer
-                  ? "របៀបប្រើប្រាស់វេទិកា"
-                  : "How students use the platform"}
-              </h2>
-              <span className="block text-[10px] font-semibold uppercase tracking-[0.26em] text-black/45">
-                {isKhmer
-                  ? "(ជំហានសិក្សា និងទាញយកឯកសារ)"
-                  : "(STUDY AND DOWNLOAD FLOW)"}
-              </span>
-            </div>
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 sm:gap-5 md:gap-6">
+          <div className="space-y-2">
+            <h2 className="text-balance text-3xl font-bold leading-tight text-black md:text-4xl">
+              {isKhmer
+                ? "របៀបប្រើប្រាស់វេទិកា"
+                : "How students use the platform"}
+            </h2>
+            <span
+              className={`block text-[10px] font-semibold text-black/45 ${
+                isKhmer ? "tracking-normal" : "uppercase tracking-normal"
+              }`}
+            >
+              {isKhmer
+                ? "(ជំហានសិក្សា និងទាញយកឯកសារ)"
+                : "(STUDY AND DOWNLOAD FLOW)"}
+            </span>
+          </div>
 
-            <div className="flex flex-col gap-2">
-              {SERVICES.map((service, index) => {
-                const isActive = activeIndex === index;
-                return (
-                  <button
-                    key={service.id}
-                    onClick={() => handleTabClick(index)}
-                    className={cn(
-                      "group relative flex items-start gap-3 rounded-xl border px-4 py-3.5 text-left transition-all duration-500 md:gap-4 md:px-5",
-                      isActive
-                        ? "border-black/10 bg-white/90 text-black shadow-[0_18px_45px_rgba(15,23,42,0.08)]"
-                        : "border-transparent bg-transparent text-black/45 hover:border-black/10 hover:bg-white/60 hover:text-black",
-                    )}
-                  >
-                    {/* Progress bar indicator */}
-                    <div className="absolute bottom-4 left-0 top-4 w-[3px] rounded-full bg-black/10">
-                      {isActive && (
-                        <motion.div
-                          key={`progress-${index}-${isPaused}`}
-                          className="absolute left-0 top-0 w-full origin-top rounded-full bg-black"
-                          initial={{ height: "0%" }}
-                          animate={
-                            isPaused ? { height: "0%" } : { height: "100%" }
-                          }
-                          transition={{
-                            duration: AUTO_PLAY_DURATION / 1000,
-                            ease: "linear",
-                          }}
-                        />
-                      )}
-                    </div>
+          <div
+            className="relative overflow-hidden rounded-2xl border border-black/10 bg-white/90 px-4 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)] backdrop-blur sm:px-5 sm:py-[1.125rem] md:px-6 md:py-5"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
+            <AnimatePresence initial={false} custom={direction} mode="wait">
+              <motion.div
+                key={activeService.id}
+                custom={direction}
+                variants={textVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{
+                  x: { type: "spring", stiffness: 260, damping: 28 },
+                  opacity: { duration: 0.22 },
+                  filter: { duration: 0.22 },
+                }}
+                className="grid min-w-0 gap-2"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="shrink-0 text-xs font-semibold tabular-nums text-black/45">
+                    /{activeService.id}
+                  </span>
+                  <span className="min-w-0 text-xl font-bold leading-tight text-black sm:text-2xl">
+                    {activeTitle}
+                  </span>
+                </div>
+                <p className="text-sm leading-6 text-black/62 sm:text-base sm:leading-7">
+                  {activeDescription}
+                </p>
+              </motion.div>
+            </AnimatePresence>
 
-                    <span className="mt-1 text-[10px] font-semibold tabular-nums opacity-60">
-                      /{service.id}
-                    </span>
-
-                    <div className="flex flex-1 flex-col gap-2">
-                      <span
-                        className={cn(
-                          "text-lg font-bold leading-tight transition-colors duration-500 md:text-xl",
-                          isActive ? "text-black" : "",
-                        )}
-                      >
-                        {isKhmer ? service.title : service.titleEn}
-                      </span>
-
-                      <AnimatePresence mode="wait">
-                        {isActive && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{
-                              duration: 0.3,
-                              ease: [0.23, 1, 0.32, 1],
-                            }}
-                            className="overflow-hidden"
-                          >
-                            <p className="max-w-md pb-1 text-sm font-normal leading-7 text-black/60">
-                              {isKhmer
-                                ? service.description
-                                : service.descriptionEn}
-                            </p>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/8">
+              <motion.div
+                key={`text-progress-${activeIndex}-${isPaused}`}
+                className="h-full origin-left bg-black"
+                initial={{ scaleX: 0 }}
+                animate={isPaused ? { scaleX: 0 } : { scaleX: 1 }}
+                transition={{
+                  duration: AUTO_PLAY_DURATION / 1000,
+                  ease: "linear",
+                }}
+              />
             </div>
           </div>
 
-          {/* Right Column: Image Gallery */}
-          <div className="order-1 flex h-full flex-col justify-center lg:order-2">
-            <div
-              className="group/gallery relative mx-auto w-full max-w-[780px]"
-              onMouseEnter={() => setIsPaused(true)}
-              onMouseLeave={() => setIsPaused(false)}
-            >
-              <div className="absolute -inset-4 rounded-2xl bg-white/58 blur-2xl" />
-              <div className="relative aspect-[16/10] min-h-[220px] overflow-hidden rounded-2xl bg-[#dfe8ef] shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:min-h-[300px] md:min-h-[360px] lg:min-h-[420px]">
+          <div
+            className="group/gallery relative mx-auto w-full"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
+            <div className="absolute -inset-3 rounded-2xl bg-white/58 blur-2xl" />
+            <div className="relative aspect-[16/10] min-h-[214px] overflow-hidden rounded-2xl bg-[#dfe8ef] shadow-[0_18px_48px_rgba(15,23,42,0.13)] sm:min-h-[300px] md:min-h-[390px] lg:min-h-[470px]">
                 <AnimatePresence
                   initial={false}
                   custom={direction}
@@ -271,58 +254,7 @@ export default function VerticalTabs({ language = "km" }) {
                     <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/18 via-black/4 to-transparent" />
                   </motion.div>
                 </AnimatePresence>
-
-                <div className="absolute left-4 top-4 z-20 rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-xs font-semibold text-black/70 shadow-sm backdrop-blur-xl md:left-5 md:top-5">
-                  /{activeService.id}
-                </div>
-
-                <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-4 rounded-full border border-white/60 bg-white/80 px-4 py-3 shadow-[0_16px_34px_rgba(15,23,42,0.14)] backdrop-blur-xl md:bottom-5 md:px-5">
-                  {/* Dot indicators */}
-                  <div className="flex gap-1.5">
-                    {SERVICES.map((service, i) => (
-                      <button
-                        key={service.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTabClick(i);
-                        }}
-                        className={cn(
-                          "rounded-full transition-all duration-300",
-                          i === activeIndex
-                            ? "h-2 w-7 bg-black"
-                            : "h-2 w-2 bg-black/20 hover:bg-black/45",
-                        )}
-                        aria-label={`Go to slide ${i + 1}`}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Navigation Buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrev();
-                      }}
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/92 text-black transition-all hover:bg-white active:scale-90 md:h-10 md:w-10"
-                      aria-label="Previous"
-                    >
-                      <ChevronLeft size={19} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleNext();
-                      }}
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/92 text-black transition-all hover:bg-white active:scale-90 md:h-10 md:w-10"
-                      aria-label="Next"
-                    >
-                      <ChevronRight size={19} />
-                    </button>
-                  </div>
-                </div>
               </div>
-            </div>
           </div>
         </div>
       </div>

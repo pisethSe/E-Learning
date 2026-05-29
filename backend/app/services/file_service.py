@@ -12,14 +12,16 @@ from fastapi import HTTPException
 from telegram import Bot
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
 except ImportError:  # pragma: no cover - optional dependency
     Image = None
+    ImageOps = None
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 UPLOADS_DIR = BASE_DIR / "uploads"
 RESOURCE_UPLOADS_DIR = UPLOADS_DIR / "resources"
 EVENT_UPLOADS_DIR = UPLOADS_DIR / "events"
+ADMIN_UPLOADS_DIR = UPLOADS_DIR / "admin"
 THUMBNAILS_DIR = UPLOADS_DIR / "thumbnails"
 CLOUDINARY_DEFAULT_FOLDER = "e-learning-grade-a"
 CLOUDINARY_LARGE_UPLOAD_THRESHOLD = 95 * 1024 * 1024
@@ -29,6 +31,7 @@ CLOUDINARY_LARGE_UPLOAD_CHUNK_SIZE = 20 * 1024 * 1024
 def ensure_storage_dirs():
     RESOURCE_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    ADMIN_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -48,6 +51,22 @@ def get_storage_backend() -> str:
 
 def using_cloudinary_storage() -> bool:
     return get_storage_backend() == "cloudinary"
+
+
+def should_store_locally_when_cloudinary(
+    *,
+    filename: Optional[str] = None,
+    file_type_hint: Optional[str] = None,
+    content_type: Optional[str] = None,
+) -> bool:
+    hint = (file_type_hint or "").strip().lower()
+    normalized_content_type = (content_type or "").lower()
+    extension = Path(filename or "").suffix.lower()
+
+    if hint in {"document", "file", "pdf"}:
+        return True
+
+    return normalized_content_type == "application/pdf" or extension == ".pdf"
 
 
 def sanitize_filename(filename: str) -> str:
@@ -87,8 +106,23 @@ def create_thumbnail(source_path: Path, output_name: str) -> Optional[str]:
     return build_public_path(UPLOADS_DIR, thumbnail_path)
 
 
+def save_thumbnail_image(image, output_name: str) -> Optional[str]:
+    if Image is None:
+        return None
+
+    ensure_storage_dirs()
+    thumbnail_path = THUMBNAILS_DIR / output_name
+    thumbnail = image.copy()
+    thumbnail.thumbnail((480, 480))
+    if thumbnail.mode != "RGB":
+        thumbnail = thumbnail.convert("RGB")
+    thumbnail.save(thumbnail_path, optimize=True)
+
+    return build_public_path(UPLOADS_DIR, thumbnail_path)
+
+
 def is_image_path(value: Optional[str]) -> bool:
-    return Path(value or "").suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+    return Path(value or "").suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"}
 
 
 def is_video_path(value: Optional[str]) -> bool:
@@ -99,10 +133,72 @@ def is_audio_path(value: Optional[str]) -> bool:
     return Path(value or "").suffix.lower() in {".mp3", ".wav", ".m4a", ".aac", ".ogg"}
 
 
+def convert_upload_image_for_pdf(upload_file):
+    if Image is None or ImageOps is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Pillow is required to combine image uploads into one PDF.",
+        )
+
+    upload_file.file.seek(0)
+    with Image.open(upload_file.file) as opened_image:
+        image = ImageOps.exif_transpose(opened_image)
+        if image.mode in {"RGBA", "LA"} or (
+            image.mode == "P" and "transparency" in image.info
+        ):
+            background = Image.new("RGB", image.size, "white")
+            alpha = image.convert("RGBA").getchannel("A")
+            background.paste(image.convert("RGBA"), mask=alpha)
+            converted_image = background
+        else:
+            converted_image = image.convert("RGB")
+        converted_image.load()
+
+    upload_file.file.seek(0)
+    return converted_image
+
+
+def store_image_uploads_as_pdf(
+    *,
+    upload_files,
+    destination_dir: Path,
+    preferred_name: Optional[str] = None,
+):
+    ensure_storage_dirs()
+
+    images = [convert_upload_image_for_pdf(upload_file) for upload_file in upload_files]
+    if not images:
+        raise HTTPException(status_code=400, detail="Provide at least one image upload")
+
+    safe_stem = sanitize_filename(Path(preferred_name or "image-upload").stem)
+    unique_name = f"{safe_stem}-{secrets.token_hex(8)}.pdf"
+    local_file_path = destination_dir / unique_name
+    first_image, *remaining_images = images
+    first_image.save(
+        local_file_path,
+        "PDF",
+        save_all=True,
+        append_images=remaining_images,
+        resolution=100.0,
+    )
+
+    thumbnail_name = f"{Path(unique_name).stem}-thumb.jpg"
+    thumbnail_public_path = save_thumbnail_image(first_image, thumbnail_name)
+    return {
+        "file_path": build_public_path(UPLOADS_DIR, local_file_path),
+        "thumbnail_path": thumbnail_public_path,
+        "original_filename": f"{safe_stem}.pdf",
+        "cloudinary_public_id": None,
+        "cloudinary_resource_type": None,
+    }
+
+
 def get_cloudinary_folder(destination_dir: Path) -> str:
     base_folder = os.getenv("CLOUDINARY_UPLOAD_FOLDER", CLOUDINARY_DEFAULT_FOLDER).strip("/")
     if destination_dir == EVENT_UPLOADS_DIR:
         return f"{base_folder}/events"
+    if destination_dir == ADMIN_UPLOADS_DIR:
+        return f"{base_folder}/admin"
     return f"{base_folder}/resources"
 
 
@@ -284,7 +380,13 @@ def store_upload_file(
     safe_stem = sanitize_filename(Path(preferred_name or original_name).stem)
     unique_name = f"{safe_stem}-{secrets.token_hex(8)}{file_extension}"
 
-    if using_cloudinary_storage():
+    content_type = getattr(upload_file, "content_type", None)
+
+    if using_cloudinary_storage() and not should_store_locally_when_cloudinary(
+        filename=original_name,
+        file_type_hint=file_type_hint,
+        content_type=content_type,
+    ):
         with tempfile.TemporaryDirectory() as temp_dir:
             local_file_path = Path(temp_dir) / unique_name
             with local_file_path.open("wb") as buffer:
@@ -295,7 +397,7 @@ def store_upload_file(
                 original_name=original_name,
                 destination_dir=destination_dir,
                 file_type_hint=file_type_hint,
-                content_type=getattr(upload_file, "content_type", None),
+                content_type=content_type,
             )
 
     local_file_path = destination_dir / unique_name

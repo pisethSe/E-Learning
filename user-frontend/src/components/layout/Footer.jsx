@@ -1,9 +1,8 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import {
   ArrowUpRight,
   BookOpen,
   Headphones,
-  Star,
 } from "lucide-react";
 
 const footerContent = {
@@ -27,13 +26,50 @@ const footerContent = {
       { label: "ជំនួយសំឡេង", href: "/audio", icon: Headphones },
     ],
     noteCards: [
-      { title: "ញញឹម", author: "អនាមិក", kind: "smile", rotate: "-rotate-6" },
-      { title: "បន្តរៀន", author: "Grade A", kind: "squiggle", rotate: "rotate-12" },
-      { title: "ផ្កាយសិក្សា", author: "អនាមិក", kind: "star", rotate: "-rotate-3" },
-      { title: "សួស្តី", author: "អនាមិក", kind: "spark", rotate: "rotate-6" },
-      { title: "អ្នកធ្វើបាន", author: "Grade A", kind: "heart", rotate: "-rotate-12" },
-      { title: "ជួបគ្នាម្តងទៀត", author: "អនាមិក", kind: "plane", rotate: "rotate-9" },
+      {
+        title: "ញញឹម",
+        author: "អនាមិក",
+        detail: "សម្រាកខ្លីៗ ហើយចាប់ផ្តើមមេរៀនបន្ទាប់ដោយចិត្តស្ងប់។",
+        kind: "smile",
+        rotate: "sm:-rotate-3",
+      },
+      {
+        title: "បន្តរៀន",
+        author: "Grade A",
+        detail: "រៀនតិចៗរៀងរាល់ថ្ងៃ ងាយចាំជាងរៀនច្រើនក្នុងពេលតែមួយ។",
+        kind: "squiggle",
+        rotate: "sm:rotate-3",
+      },
+      {
+        title: "ផ្កាយសិក្សា",
+        author: "អនាមិក",
+        detail: "កត់ត្រាចំណុចសំខាន់ ៣ ចំណុចបន្ទាប់ពីអានឯកសារនីមួយៗ។",
+        kind: "star",
+        rotate: "sm:-rotate-2",
+      },
+      {
+        title: "សួស្តី",
+        author: "អនាមិក",
+        detail: "ចាប់ផ្តើមពីមុខវិជ្ជាដែលពិបាកជាងគេ ពេលថាមពលនៅល្អ។",
+        kind: "spark",
+        rotate: "sm:rotate-2",
+      },
+      {
+        title: "អ្នកធ្វើបាន",
+        author: "Grade A",
+        detail: "បើមិនទាន់យល់ សាកល្បងស្តាប់សំឡេង ឬមើលឯកសារម្តងទៀត។",
+        kind: "heart",
+        rotate: "sm:-rotate-3",
+      },
+      {
+        title: "ជួបគ្នាម្តងទៀត",
+        author: "អនាមិក",
+        detail: "រក្សាឯកសារដែលចូលចិត្ត ហើយត្រឡប់មករៀនឡើងវិញថ្ងៃស្អែក។",
+        kind: "plane",
+        rotate: "sm:rotate-3",
+      },
     ],
+    tipTitle: "គន្លឹះសិក្សា",
     credit: "បង្កើតដោយ : Se Piseth",
     footerLine: "ឯកសារ មេរៀនសំឡេង និងជំនួយវិញ្ញាសា នៅកន្លែងតែមួយ។",
   },
@@ -57,13 +93,50 @@ const footerContent = {
       { label: "AUDIO SUPPORT", href: "/audio", icon: Headphones },
     ],
     noteCards: [
-      { title: "happy face", author: "Anonymous", kind: "smile", rotate: "-rotate-6" },
-      { title: "keep learning", author: "Grade A", kind: "squiggle", rotate: "rotate-12" },
-      { title: "study star", author: "Anonymous", kind: "star", rotate: "-rotate-3" },
-      { title: "hello", author: "Anonymous", kind: "spark", rotate: "rotate-6" },
-      { title: "you can do it", author: "Grade A", kind: "heart", rotate: "-rotate-12" },
-      { title: "see you", author: "Anonymous", kind: "plane", rotate: "rotate-9" },
+      {
+        title: "happy face",
+        author: "Anonymous",
+        detail: "Take a short pause, then begin the next lesson with a clear mind.",
+        kind: "smile",
+        rotate: "sm:-rotate-3",
+      },
+      {
+        title: "keep learning",
+        author: "Grade A",
+        detail: "A little study every day is easier to remember than one long session.",
+        kind: "squiggle",
+        rotate: "sm:rotate-3",
+      },
+      {
+        title: "study star",
+        author: "Anonymous",
+        detail: "Write down three key points after each file you read.",
+        kind: "star",
+        rotate: "sm:-rotate-2",
+      },
+      {
+        title: "hello",
+        author: "Anonymous",
+        detail: "Start with the hardest subject while your energy is still strong.",
+        kind: "spark",
+        rotate: "sm:rotate-2",
+      },
+      {
+        title: "you can do it",
+        author: "Grade A",
+        detail: "If it is unclear, listen again or reopen the document later.",
+        kind: "heart",
+        rotate: "sm:-rotate-3",
+      },
+      {
+        title: "see you",
+        author: "Anonymous",
+        detail: "Keep the useful files close and review them again tomorrow.",
+        kind: "plane",
+        rotate: "sm:rotate-3",
+      },
     ],
+    tipTitle: "Study Tip",
     credit: "Created by : Se Piseth",
     footerLine: "Study materials, audio lessons, and exam support in one place.",
   },
@@ -105,8 +178,8 @@ function FooterLink({
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
-      className={`group flex items-center gap-2 tracking-wide text-black/80 transition-all duration-300 hover:translate-x-1 hover:text-black ${
-        isKhmer ? "text-sm font-bold" : "text-base font-medium"
+      className={`group flex items-center gap-2 text-black/80 transition-all duration-300 hover:translate-x-1 hover:text-black ${
+        isKhmer ? "text-sm font-bold tracking-normal" : "text-base font-medium tracking-wide"
       }`}
     >
       {Icon ? <Icon className="h-4 w-4 text-black/40 transition-colors group-hover:text-black" /> : null}
@@ -118,7 +191,27 @@ function FooterLink({
   );
 }
 
-function Doodle({ kind }) {
+const burstPalette = {
+  smile: "#d4a514",
+  squiggle: "#343434",
+  star: "#e85aa8",
+  spark: "#343434",
+  heart: "#e39f55",
+  plane: "#343434",
+};
+
+const burstParticles = [
+  { dx: -88, dy: -62, scale: 0.56, rotate: -18, delay: 0 },
+  { dx: -58, dy: -108, scale: 0.42, rotate: 14, delay: 24 },
+  { dx: 0, dy: -126, scale: 0.5, rotate: -8, delay: 8 },
+  { dx: 64, dy: -98, scale: 0.46, rotate: 18, delay: 34 },
+  { dx: 94, dy: -34, scale: 0.58, rotate: 26, delay: 12 },
+  { dx: 68, dy: 52, scale: 0.4, rotate: -16, delay: 42 },
+  { dx: -16, dy: 82, scale: 0.48, rotate: 12, delay: 18 },
+  { dx: -82, dy: 28, scale: 0.44, rotate: -28, delay: 32 },
+];
+
+function Doodle({ kind, className = "h-16 w-16" }) {
   const props = {
     fill: "none",
     stroke: "currentColor",
@@ -129,7 +222,7 @@ function Doodle({ kind }) {
 
   if (kind === "smile") {
     return (
-      <svg viewBox="0 0 120 120" className="h-16 w-16 text-[#d4a514]">
+      <svg viewBox="0 0 120 120" className={`${className} text-[#d4a514]`}>
         <circle cx="60" cy="60" r="38" {...props} />
         <circle cx="47" cy="50" r="3" fill="currentColor" stroke="none" />
         <circle cx="73" cy="50" r="3" fill="currentColor" stroke="none" />
@@ -140,7 +233,7 @@ function Doodle({ kind }) {
 
   if (kind === "star") {
     return (
-      <svg viewBox="0 0 120 120" className="h-16 w-16 text-[#e85aa8]">
+      <svg viewBox="0 0 120 120" className={`${className} text-[#e85aa8]`}>
         <path
           d="M60 18 71 45l29 2-22 18 7 29-25-16-25 16 7-29-22-18 29-2z"
           {...props}
@@ -151,7 +244,7 @@ function Doodle({ kind }) {
 
   if (kind === "heart") {
     return (
-      <svg viewBox="0 0 120 120" className="h-16 w-16 text-[#e39f55]">
+      <svg viewBox="0 0 120 120" className={`${className} text-[#e39f55]`}>
         <path
           d="M60 90 26 56c-9-9-9-24 0-33 9-9 24-9 33 0l1 1 1-1c9-9 24-9 33 0 9 9 9 24 0 33z"
           {...props}
@@ -162,7 +255,7 @@ function Doodle({ kind }) {
 
   if (kind === "plane") {
     return (
-      <svg viewBox="0 0 120 120" className="h-16 w-16 text-black/80">
+      <svg viewBox="0 0 120 120" className={`${className} text-black/80`}>
         <path d="M20 65 98 28 74 95 58 68z" {...props} />
         <path d="M58 68 44 84" {...props} />
       </svg>
@@ -171,7 +264,7 @@ function Doodle({ kind }) {
 
   if (kind === "spark") {
     return (
-      <svg viewBox="0 0 120 120" className="h-16 w-16 text-black/80">
+      <svg viewBox="0 0 120 120" className={`${className} text-black/80`}>
         <path d="M60 18v18" {...props} />
         <path d="M60 84v18" {...props} />
         <path d="M18 60h18" {...props} />
@@ -185,23 +278,83 @@ function Doodle({ kind }) {
   }
 
   return (
-    <svg viewBox="0 0 120 120" className="h-16 w-16 text-black/80">
+    <svg viewBox="0 0 120 120" className={`${className} text-black/80`}>
       <path d="M20 74c10-18 22-28 34-28s20 9 29 9c8 0 13-6 17-13" {...props} />
       <path d="M24 94c17-16 33-18 46-10 12 8 23 6 30-8" {...props} />
     </svg>
   );
 }
 
-function NoteCard({ title, author, kind, rotate, isKhmer = false }) {
+function NoteBurst({ burst }) {
+  if (!burst) return null;
+
+  const color = burstPalette[burst.kind] ?? burstPalette.spark;
+  const sharedStyle = {
+    "--burst-x": `${burst.x}px`,
+    "--burst-y": `${burst.y}px`,
+    "--burst-color": color,
+  };
+
   return (
-    <article
-      className={`group flex h-[132px] w-[112px] flex-col justify-between rounded-sm border border-black/10 bg-[#fffdf8] p-3 shadow-[0_18px_32px_rgba(15,23,42,0.08)] transition-transform duration-300 hover:-translate-y-2 hover:rotate-0 sm:h-[150px] sm:w-[128px] ${rotate}`}
+    <div key={burst.id} className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+      <span className="footer-note-burst-ring" style={sharedStyle} />
+      <span className="footer-note-burst-glow" style={sharedStyle} />
+      <span className="footer-note-burst-hero" style={sharedStyle}>
+        <Doodle kind={burst.kind} className="h-12 w-12" />
+      </span>
+      {burstParticles.map((particle, index) => (
+        <span
+          key={`${burst.id}-${index}`}
+          className="footer-note-burst-particle"
+          style={{
+            ...sharedStyle,
+            "--burst-dx": `${particle.dx}px`,
+            "--burst-dy": `${particle.dy}px`,
+            "--burst-scale": particle.scale,
+            "--burst-rotate": `${particle.rotate}deg`,
+            "--burst-delay": `${particle.delay}ms`,
+          }}
+        >
+          <Doodle kind={burst.kind} className="h-7 w-7" />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function NoteCard({
+  title,
+  author,
+  kind,
+  rotate,
+  isActive = false,
+  isKhmer = false,
+  onClick,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={isActive}
+      className={`group relative flex min-h-[118px] w-full flex-col justify-between overflow-hidden rounded-xl border p-3 text-left shadow-[0_12px_26px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:rotate-0 active:scale-[0.985] sm:min-h-[150px] sm:rounded-sm ${
+        isActive
+          ? "border-black bg-white text-black shadow-[0_18px_38px_rgba(15,23,42,0.10)]"
+          : "border-black/10 bg-[#fffdf8] text-black hover:border-black/18"
+      } ${rotate}`}
     >
-      <div className="flex justify-center pt-1">
-        <Doodle kind={kind} />
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute left-1/2 top-8 h-20 w-20 -translate-x-1/2 rounded-full opacity-0 blur-xl transition-opacity duration-300 group-hover:opacity-25 ${
+          isActive ? "bg-black/10" : "bg-white"
+        }`}
+      />
+      <div className="relative flex justify-center pt-0.5 sm:pt-1">
+        <span className={isActive ? "footer-note-active-doodle" : "transition-transform duration-300 group-hover:scale-110"}>
+          <Doodle kind={kind} />
+        </span>
       </div>
       <div
-        className={`border-t border-black/10 ${
+        className={`relative border-t border-black/10 ${
           isKhmer ? "space-y-0.5 pt-1.5" : "space-y-1 pt-2"
         }`}
       >
@@ -215,22 +368,42 @@ function NoteCard({ title, author, kind, rotate, isKhmer = false }) {
           {title}
         </p>
         <p
-          className={`tracking-[0.2em] text-black/35 ${
+          className={`text-black/35 ${
             isKhmer
-              ? "text-[9px] font-semibold leading-[1.25]"
-              : "text-[10px] uppercase"
+              ? "text-[9px] font-semibold leading-[1.25] tracking-normal"
+              : "text-[10px] uppercase tracking-[0.2em]"
           }`}
         >
           {author}
         </p>
       </div>
-    </article>
+    </button>
   );
 }
 
 export default function Footer({ language = "km" }) {
   const content = footerContent[language] ?? footerContent.km;
   const isKhmer = language === "km";
+  const [activeNoteIndex, setActiveNoteIndex] = useState(1);
+  const [burst, setBurst] = useState(null);
+  const noteStageRef = useRef(null);
+  const burstIdRef = useRef(0);
+  const activeNote = content.noteCards[activeNoteIndex] ?? content.noteCards[0];
+
+  const handleNotePress = (index, kind, event) => {
+    setActiveNoteIndex(index);
+
+    if (!noteStageRef.current) return;
+
+    const stageRect = noteStageRef.current.getBoundingClientRect();
+    burstIdRef.current += 1;
+    setBurst({
+      id: `${kind}-${burstIdRef.current}`,
+      kind,
+      x: event.clientX - stageRect.left,
+      y: event.clientY - stageRect.top,
+    });
+  };
 
   return (
     <footer
@@ -258,10 +431,10 @@ export default function Footer({ language = "km" }) {
         }`}
       >
         <div
-          className={`flex items-center tracking-[0.18em] text-black/55 ${
+          className={`flex items-center text-black/55 ${
             isKhmer
-              ? "gap-2.5 text-xs font-bold"
-              : "gap-3 text-sm font-semibold uppercase"
+              ? "gap-2.5 text-xs font-bold tracking-normal"
+              : "gap-3 text-sm font-semibold uppercase tracking-[0.18em]"
           }`}
         >
           <span className="h-2.5 w-2.5 rounded-full bg-black" />
@@ -276,7 +449,7 @@ export default function Footer({ language = "km" }) {
           <div className="max-w-5xl">
             {isKhmer ? (
               <h2
-                className="text-[clamp(2.35rem,5vw,4rem)] font-bold leading-[1.14] tracking-[-0.025em] text-black"
+                className="text-[clamp(2.35rem,5vw,4rem)] font-bold leading-[1.14] tracking-normal text-black"
                 style={{ fontFamily: "var(--font-kantumruy)" }}
               >
                 {content.headlineLines.map((line) => (
@@ -316,8 +489,10 @@ export default function Footer({ language = "km" }) {
           >
             <div className={isKhmer ? "space-y-3.5" : "space-y-5"}>
               <p
-                className={`tracking-[0.18em] text-black/45 ${
-                  isKhmer ? "text-xs font-bold" : "text-sm font-semibold uppercase"
+                className={`text-black/45 ${
+                  isKhmer
+                    ? "text-xs font-bold tracking-normal"
+                    : "text-sm font-semibold uppercase tracking-[0.18em]"
                 }`}
               >
                 {content.exploreTitle}
@@ -331,8 +506,10 @@ export default function Footer({ language = "km" }) {
 
             <div className={isKhmer ? "space-y-3.5" : "space-y-5"}>
               <p
-                className={`tracking-[0.18em] text-black/45 ${
-                  isKhmer ? "text-xs font-bold" : "text-sm font-semibold uppercase"
+                className={`text-black/45 ${
+                  isKhmer
+                    ? "text-xs font-bold tracking-normal"
+                    : "text-sm font-semibold uppercase tracking-[0.18em]"
                 }`}
               >
                 {content.contactTitle}
@@ -346,21 +523,55 @@ export default function Footer({ language = "km" }) {
           </div>
         </div>
 
-        <div
-          className={`relative flex flex-wrap items-end ${
-            isKhmer
-              ? "mt-12 gap-3.5 sm:gap-4.5 lg:gap-5"
-              : "mt-16 gap-4 sm:gap-5 lg:gap-6"
-          }`}
-        >
-          {content.noteCards.map((card) => (
-            <NoteCard key={card.title} isKhmer={isKhmer} {...card} />
-          ))}
-
-          <div className="absolute -bottom-3 right-0 hidden rotate-[-14deg] lg:flex">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full border border-black/10 bg-[#fffdf8] shadow-[0_18px_32px_rgba(15,23,42,0.08)]">
-              <Star className="h-10 w-10 text-black/65" />
+        <div className={isKhmer ? "mt-12" : "mt-16"}>
+          <div
+            ref={noteStageRef}
+            className="relative grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:items-stretch lg:gap-6"
+          >
+            <NoteBurst burst={burst} />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:gap-4">
+              {content.noteCards.map((card, index) => (
+                <NoteCard
+                  key={card.title}
+                  isKhmer={isKhmer}
+                  isActive={activeNoteIndex === index}
+                  onClick={(event) => handleNotePress(index, card.kind, event)}
+                  {...card}
+                />
+              ))}
             </div>
+
+            <aside className="flex min-h-[148px] flex-col justify-between rounded-2xl border border-black/10 bg-white/88 p-4 shadow-[0_18px_42px_rgba(15,23,42,0.07)] backdrop-blur sm:p-5">
+              <div>
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <p
+                    className={`font-bold text-black/45 ${
+                      isKhmer
+                        ? "text-xs tracking-normal"
+                        : "text-xs uppercase tracking-normal"
+                    }`}
+                  >
+                    {content.tipTitle}
+                  </p>
+                  <span
+                    key={`${activeNote.kind}-${burst?.id ?? "initial"}`}
+                    className="footer-note-tip-icon flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-[#fffdf8]"
+                    style={{ "--burst-color": burstPalette[activeNote.kind] ?? burstPalette.spark }}
+                  >
+                    <Doodle kind={activeNote.kind} className="h-6 w-6" />
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold leading-tight text-black">
+                  {activeNote.title}
+                </h3>
+                <p className="mt-3 text-sm font-semibold leading-7 text-black/62">
+                  {activeNote.detail}
+                </p>
+              </div>
+              <p className="mt-5 text-xs font-bold text-black/38">
+                {activeNote.author}
+              </p>
+            </aside>
           </div>
         </div>
 

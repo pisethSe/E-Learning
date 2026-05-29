@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { ExternalLink, Filter, MoreVertical, Search } from "lucide-react";
+import { ExternalLink, Eye, Filter, Pencil, Search, Trash2 } from "lucide-react";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
-import { resolveAssetUrl } from "../../services/api";
+import { resolveAdminResourcePreviewUrl, resolveAssetUrl } from "../../services/api";
 import {
   GRADE_OPTIONS,
   RESOURCE_CATEGORIES,
@@ -14,7 +14,21 @@ import {
 } from "../../data/learningCatalog";
 
 function getSourceLink(resource) {
-  return resource.external_url || resolveAssetUrl(resource.file_path);
+  if (resource.id) {
+    return resolveAdminResourcePreviewUrl(resource);
+  }
+
+  const externalUrl = String(resource.external_url || "").trim();
+
+  if (externalUrl) {
+    if (/^([a-z][a-z\d+\-.]*:)?\/\//i.test(externalUrl) || externalUrl.startsWith("/")) {
+      return externalUrl;
+    }
+
+    return `https://${externalUrl}`;
+  }
+
+  return resolveAssetUrl(resource.file_path);
 }
 
 function normalizeTableMode(mode = "file") {
@@ -29,29 +43,12 @@ function normalizeTableMode(mode = "file") {
   return "file";
 }
 
-function hasImageExtension(value = "") {
-  return /\.(avif|gif|jpe?g|png|webp)$/i.test(String(value).split("?")[0]);
-}
-
 function isPhotoResource(resource) {
   if (!resource) {
     return false;
   }
 
-  if (resource.file_type === "image" || resource.file_type === "photo") {
-    return true;
-  }
-
-  if (resource.file_type !== "document") {
-    return false;
-  }
-
-  return Boolean(
-    resource.thumbnail_path ||
-      hasImageExtension(resource.file_path) ||
-      hasImageExtension(resource.original_filename) ||
-      hasImageExtension(resource.external_url),
-  );
+  return resource.file_type === "image" || resource.file_type === "photo";
 }
 
 function getResourceScope(resource, mode) {
@@ -198,6 +195,20 @@ export default function ResourceTable({
     : isPhotoMode
       ? "Search image files..."
       : "Search files...";
+
+  function handleView(resource) {
+    const sourceLink = getSourceLink(resource);
+
+    if (!sourceLink) {
+      return;
+    }
+
+    const openedWindow = window.open(sourceLink, "_blank", "noopener,noreferrer");
+
+    if (!openedWindow) {
+      window.location.assign(sourceLink);
+    }
+  }
 
   return (
     <Card className="overflow-hidden p-0">
@@ -361,38 +372,43 @@ export default function ResourceTable({
                     </td>
                     <td className="px-6 py-4">
                       {sourceLink ? (
-                        <a
-                          href={sourceLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700"
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5 text-primary-600 hover:bg-primary-50 hover:text-primary-700"
+                          onClick={() => handleView(resource)}
                         >
+                          <Eye size={15} />
                           View
                           <ExternalLink size={14} />
-                        </a>
+                        </Button>
                       ) : (
                         <span className="text-slate-400">No file</span>
                       )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => onEdit(resource)}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => onEdit(resource)}
+                        >
+                          <Pencil size={14} />
                           Edit
                         </Button>
                         <Button
+                          type="button"
                           variant="ghost"
                           size="sm"
-                          className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                          onClick={() => onDelete(resource.id)}
+                          className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => onDelete(resource)}
                         >
+                          <Trash2 size={14} />
                           Delete
                         </Button>
-                        <button
-                          type="button"
-                          className="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                        >
-                          <MoreVertical size={16} />
-                        </button>
                       </div>
                     </td>
                   </tr>

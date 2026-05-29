@@ -162,7 +162,7 @@ export const RESOURCE_FILE_TYPES = [
   {
     value: "image",
     label: "Image file",
-    accept: "image/*,.jpg,.jpeg,.png,.webp,.gif",
+    accept: "image/*,.jpg,.jpeg,.png,.webp,.gif,.avif",
   },
   {
     value: "audio",

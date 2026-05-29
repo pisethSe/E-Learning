@@ -86,34 +86,62 @@ const CardSwap = ({
   const order = useRef(Array.from({ length: childArr.length }, (_, i) => i));
 
   const tlRef = useRef(null);
-  const intervalRef = useRef();
+  const timerRef = useRef(null);
+  const isSwappingRef = useRef(false);
   const container = useRef(null);
 
   useEffect(() => {
     const total = refs.length;
-    refs.forEach((r, i) =>
-      placeNow(
-        r.current,
-        makeSlot(i, cardDistance, verticalDistance, total),
-        skewAmount,
-      ),
-    );
+    order.current = Array.from({ length: total }, (_, i) => i);
+    isSwappingRef.current = false;
+
+    const placeStack = () => {
+      order.current.forEach((idx, i) =>
+        placeNow(
+          refs[idx]?.current,
+          makeSlot(i, cardDistance, verticalDistance, total),
+          skewAmount,
+        ),
+      );
+    };
+
+    placeStack();
+
+    const scheduleNextSwap = () => {
+      timerRef.current?.kill();
+
+      if (total > 1) {
+        timerRef.current = gsap.delayedCall(delay / 1000, swap);
+      }
+    };
 
     const swap = () => {
-      if (order.current.length < 2) return;
+      if (order.current.length < 2 || isSwappingRef.current) {
+        return;
+      }
 
       const [front, ...rest] = order.current;
       const elFront = refs[front].current;
 
       if (!elFront) {
+        scheduleNextSwap();
         return;
       }
 
-      const tl = gsap.timeline();
+      isSwappingRef.current = true;
+      const dropDistance = Math.max(height + verticalDistance + 72, 420);
+      const tl = gsap.timeline({
+        defaults: { overwrite: "auto" },
+        onComplete: () => {
+          order.current = [...rest, front];
+          isSwappingRef.current = false;
+          scheduleNextSwap();
+        },
+      });
       tlRef.current = tl;
 
       tl.to(elFront, {
-        y: "+=500",
+        y: `+=${dropDistance}`,
         duration: config.durDrop,
         ease: config.ease,
       });
@@ -165,31 +193,28 @@ const CardSwap = ({
         },
         "return",
       );
-
-      tl.call(() => {
-        order.current = [...rest, front];
-      });
     };
 
-    intervalRef.current = window.setInterval(swap, delay);
+    scheduleNextSwap();
 
     if (pauseOnHover) {
       const node = container.current;
       if (!node) {
         return () => {
           tlRef.current?.kill();
-          clearInterval(intervalRef.current);
+          timerRef.current?.kill();
+          gsap.killTweensOf(refs.map((ref) => ref.current).filter(Boolean));
+          isSwappingRef.current = false;
         };
       }
 
       const pause = () => {
         tlRef.current?.pause();
-        clearInterval(intervalRef.current);
+        timerRef.current?.pause();
       };
       const resume = () => {
         tlRef.current?.play();
-        clearInterval(intervalRef.current);
-        intervalRef.current = window.setInterval(swap, delay);
+        timerRef.current?.resume();
       };
       node.addEventListener("mouseenter", pause);
       node.addEventListener("mouseleave", resume);
@@ -197,15 +222,28 @@ const CardSwap = ({
         node.removeEventListener("mouseenter", pause);
         node.removeEventListener("mouseleave", resume);
         tlRef.current?.kill();
-        clearInterval(intervalRef.current);
+        timerRef.current?.kill();
+        gsap.killTweensOf(refs.map((ref) => ref.current).filter(Boolean));
+        isSwappingRef.current = false;
       };
     }
     return () => {
       tlRef.current?.kill();
-      clearInterval(intervalRef.current);
+      timerRef.current?.kill();
+      gsap.killTweensOf(refs.map((ref) => ref.current).filter(Boolean));
+      isSwappingRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardDistance, verticalDistance, delay, pauseOnHover, skewAmount, easing]);
+  }, [
+    cardDistance,
+    verticalDistance,
+    delay,
+    pauseOnHover,
+    skewAmount,
+    easing,
+    width,
+    height,
+  ]);
 
   const rendered = childArr.map((child, i) =>
     isValidElement(child)

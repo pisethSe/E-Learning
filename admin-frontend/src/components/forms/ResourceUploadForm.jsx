@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { FilePlus2, Save } from "lucide-react";
+import React, { useCallback, useId, useRef, useState } from "react";
+import { AnimatePresence, motion as Motion } from "framer-motion";
+import { FileCheck2, FilePlus2, Save, UploadCloud, X } from "lucide-react";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 import {
@@ -12,6 +13,25 @@ import {
   getSubjectsForGrade,
   normalizeCategoryId,
 } from "../../data/learningCatalog";
+
+const FILE_SIZES = ["Bytes", "KB", "MB", "GB", "TB"];
+
+function cn(...classes) {
+  return classes.filter(Boolean).join(" ");
+}
+
+function formatBytes(bytes, decimals = 2) {
+  if (!+bytes) {
+    return "0 Bytes";
+  }
+
+  const sizeStep = 1024;
+  const digits = decimals < 0 ? 0 : decimals;
+  const index = Math.floor(Math.log(bytes) / Math.log(sizeStep));
+  const unit = FILE_SIZES[index] || FILE_SIZES[FILE_SIZES.length - 1];
+
+  return `${Number.parseFloat((bytes / sizeStep ** index).toFixed(digits))} ${unit}`;
+}
 
 function normalizeUploadMode(mode = "file") {
   if (mode === "audio") {
@@ -92,6 +112,7 @@ function createDefaultForm(mode = "file") {
     external_url: "",
     is_published: true,
     file: null,
+    image: null,
   };
 }
 
@@ -119,11 +140,309 @@ function createInitialState(resource, mode) {
     external_url: resource.external_url || "",
     is_published: Boolean(resource.is_published),
     file: null,
+    image: null,
   };
 }
 
 function FieldLabel({ children }) {
   return <span className="mb-2 block text-sm font-medium text-slate-700">{children}</span>;
+}
+
+function UploadIllustration() {
+  return (
+    <div className="relative h-16 w-16">
+      <svg
+        aria-label="Upload illustration"
+        className="h-full w-full"
+        fill="none"
+        viewBox="0 0 100 100"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <title>Upload File Illustration</title>
+        <circle
+          className="stroke-slate-200"
+          cx="50"
+          cy="50"
+          r="45"
+          strokeDasharray="4 4"
+          strokeWidth="2"
+        >
+          <animateTransform
+            attributeName="transform"
+            dur="60s"
+            from="0 50 50"
+            repeatCount="indefinite"
+            to="360 50 50"
+            type="rotate"
+          />
+        </circle>
+        <path
+          className="fill-primary-50 stroke-primary-500"
+          d="M30 35H70C75 35 75 40 75 40V65C75 70 70 70 70 70H30C25 70 25 65 25 65V40C25 35 30 35 30 35Z"
+          strokeWidth="2"
+        />
+        <path
+          className="stroke-primary-500"
+          d="M30 35C30 35 35 35 40 35C45 35 45 30 50 30C55 30 55 35 60 35C65 35 70 35 70 35"
+          fill="none"
+          strokeWidth="2"
+        />
+        <g className="translate-y-2 transform">
+          <line
+            className="stroke-primary-500"
+            strokeLinecap="round"
+            strokeWidth="2"
+            x1="50"
+            x2="50"
+            y1="45"
+            y2="60"
+          />
+          <polyline
+            className="stroke-primary-500"
+            fill="none"
+            points="42,52 50,45 58,52"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+          />
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+function FileDropzone({
+  accept = "",
+  file = null,
+  label,
+  helperText,
+  multiple = false,
+  buttonText = "Upload File",
+  onFileSelect,
+  onFileRemove,
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const inputId = useId();
+  const fileInputRef = useRef(null);
+  const selectedFiles = Array.isArray(file) ? file : file ? [file] : [];
+  const selectedFileCount = selectedFiles.length;
+  const totalSelectedSize = selectedFiles.reduce(
+    (total, selectedFile) => total + (selectedFile?.size || 0),
+    0,
+  );
+
+  const triggerFileInput = useCallback(() => {
+    const fileInput = fileInputRef.current;
+
+    if (!fileInput) {
+      return;
+    }
+
+    try {
+      if (typeof fileInput.showPicker === "function") {
+        fileInput.showPicker();
+        return;
+      }
+    } catch {
+      // Some browsers expose showPicker but block it in edge cases; click is the fallback.
+    }
+
+    fileInput.click();
+  }, []);
+
+  const handleFileSelect = useCallback(
+    (selectedFileList) => {
+      const files = Array.from(selectedFileList || []).filter(Boolean);
+
+      if (!files.length) {
+        return;
+      }
+
+      onFileSelect(multiple ? files : files[0]);
+      setIsDragging(false);
+    },
+    [multiple, onFileSelect],
+  );
+
+  const handleDragOver = useCallback((event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handleFileSelect(event.dataTransfer.files || null);
+    },
+    [handleFileSelect],
+  );
+
+  const handleInputChange = useCallback(
+    (event) => {
+      handleFileSelect(event.target.files || null);
+      event.target.value = "";
+    },
+    [handleFileSelect],
+  );
+
+  return (
+    <div
+      aria-label={label}
+      className="group relative w-full rounded-xl bg-white p-0.5 ring-1 ring-slate-200"
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      role="complementary"
+    >
+      <div className="absolute inset-x-0 -top-px h-px w-full bg-gradient-to-r from-transparent via-primary-500/25 to-transparent" />
+
+      <div className="relative rounded-[10px] bg-slate-50/80 p-1.5">
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-lg border border-slate-100 bg-white transition-colors",
+            isDragging && "border-primary-300 bg-primary-50/60",
+          )}
+        >
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-0 transition-opacity duration-300",
+              isDragging ? "opacity-100" : "opacity-0",
+            )}
+          >
+            <div className="absolute inset-x-0 top-0 h-[20%] bg-gradient-to-b from-primary-500/10 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-[20%] bg-gradient-to-t from-primary-500/10 to-transparent" />
+            <div className="absolute inset-y-0 left-0 w-[20%] bg-gradient-to-r from-primary-500/10 to-transparent" />
+            <div className="absolute inset-y-0 right-0 w-[20%] bg-gradient-to-l from-primary-500/10 to-transparent" />
+            <div className="absolute inset-[20%] animate-pulse rounded-lg bg-primary-500/5" />
+          </div>
+
+          <input
+            accept={accept}
+            aria-label={label}
+            className="sr-only"
+            id={inputId}
+            multiple={multiple}
+            onChange={handleInputChange}
+            ref={fileInputRef}
+            type="file"
+          />
+
+          <div className="relative min-h-[220px]">
+            <AnimatePresence mode="wait">
+              {selectedFileCount ? (
+                <Motion.div
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center"
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  key="selected"
+                >
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+                    <FileCheck2 className="h-8 w-8" />
+                  </div>
+                  <h3 className="max-w-full truncate text-sm font-semibold text-slate-900">
+                    {selectedFileCount === 1
+                      ? selectedFiles[0].name
+                      : `${selectedFileCount} files selected`}
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatBytes(totalSelectedSize)} selected
+                  </p>
+                  {selectedFileCount > 1 ? (
+                    <div className="mt-3 grid max-h-20 w-full max-w-xs gap-1 overflow-hidden text-left">
+                      {selectedFiles.slice(0, 4).map((selectedFile) => (
+                        <p
+                          className="truncate rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-500"
+                          key={`${selectedFile.name}-${selectedFile.size}-${selectedFile.lastModified}`}
+                        >
+                          {selectedFile.name}
+                        </p>
+                      ))}
+                      {selectedFileCount > 4 ? (
+                        <p className="px-2 text-xs font-medium text-slate-500">
+                          +{selectedFileCount - 4} more
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="mt-5 flex w-full max-w-xs gap-2">
+                    <button
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
+                      onClick={triggerFileInput}
+                      type="button"
+                    >
+                      Replace
+                      <UploadCloud className="h-4 w-4" />
+                    </button>
+                    <button
+                      aria-label="Remove selected file"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-red-200 hover:text-red-600"
+                      onClick={onFileRemove}
+                      type="button"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </Motion.div>
+              ) : (
+                <Motion.div
+                  animate={{
+                    opacity: isDragging ? 0.86 : 1,
+                    y: 0,
+                    scale: isDragging ? 0.98 : 1,
+                  }}
+                  className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center"
+                  exit={{ opacity: 0, y: -10 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  key="dropzone"
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="mb-4">
+                    <UploadIllustration />
+                  </div>
+
+                  <div className="mb-4 space-y-1.5">
+                    <h3 className="text-lg font-semibold tracking-tight text-slate-900">
+                      Drag and drop or
+                    </h3>
+                    <p className="text-xs leading-5 text-slate-500">
+                      {helperText}
+                    </p>
+                  </div>
+
+                  <button
+                    className="group/upload flex w-4/5 items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
+                    onClick={triggerFileInput}
+                    type="button"
+                  >
+                    <span>{buttonText}</span>
+                    <UploadCloud className="h-4 w-4 transition-transform duration-200 group-hover/upload:scale-110" />
+                  </button>
+
+                  <p className="mt-3 text-xs text-slate-500">
+                    {multiple
+                      ? "or drag and drop your files here"
+                      : "or drag and drop your file here"}
+                  </p>
+                </Motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function ResourceUploadForm({
@@ -132,20 +451,24 @@ export default function ResourceUploadForm({
   onSubmit,
   onCancel,
   isSaving,
+  errorMessage = "",
 }) {
   const [formState, setFormState] = useState(() => createInitialState(resource, mode));
+  const [localError, setLocalError] = useState("");
   const uploadMode = normalizeUploadMode(mode);
   const isAudioUpload = uploadMode === "audio";
   const subjectOptions = isAudioUpload
     ? [AUDIO_SUBJECT]
     : getSubjectsForGrade(formState.grade_level);
   const uploadFileType = getFileTypeForMode(uploadMode);
+  const supportsPreviewImage = uploadMode === "file" || uploadMode === "audio";
   const activeFileType =
     RESOURCE_FILE_TYPES.find((type) => type.value === uploadFileType) ||
     RESOURCE_FILE_TYPES[0];
   const modeText = getModeText(uploadMode, Boolean(resource));
 
   function updateField(field, value) {
+    setLocalError("");
     setFormState((current) => ({
       ...current,
       [field]: value,
@@ -163,6 +486,16 @@ export default function ResourceUploadForm({
   async function handleSubmit(event) {
     event.preventDefault();
 
+    const hasSelectedFile = Array.isArray(formState.file)
+      ? formState.file.length > 0
+      : formState.file instanceof File;
+    const hasExternalUrl = Boolean(String(formState.external_url || "").trim());
+
+    if (!resource && !hasSelectedFile && !hasExternalUrl) {
+      setLocalError("Choose a file or enter an external URL before uploading.");
+      return;
+    }
+
     const wasSaved = await onSubmit({
       ...formState,
       grade_level: Number(formState.grade_level),
@@ -173,8 +506,11 @@ export default function ResourceUploadForm({
 
     if (wasSaved && !resource) {
       setFormState(createDefaultForm(uploadMode));
+      setLocalError("");
     }
   }
+
+  const visibleError = localError || errorMessage;
 
   return (
     <Card>
@@ -290,20 +626,46 @@ export default function ResourceUploadForm({
           />
         </label>
 
-        <label className="block">
+        <div className="block">
           <FieldLabel>{resource ? "Replace uploaded file" : "Upload file"}</FieldLabel>
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-            <input
-              type="file"
-              accept={activeFileType.accept}
-              onChange={(event) => updateField("file", event.target.files?.[0] || null)}
-              className="block w-full text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:font-medium file:text-white hover:file:bg-primary-700"
+          <FileDropzone
+            accept={activeFileType.accept}
+            buttonText={resource ? "Replace File" : modeText.action}
+            file={formState.file}
+            helperText={
+              uploadMode === "photo" && !resource
+                ? "Select or drag several images to combine them into one PDF file for students."
+                : modeText.accepted
+            }
+            label={resource ? "Replace uploaded file" : "Upload file"}
+            multiple={uploadMode === "photo" && !resource}
+            onFileRemove={() => updateField("file", null)}
+            onFileSelect={(file) => updateField("file", file)}
+          />
+        </div>
+
+        {supportsPreviewImage ? (
+          <div className="block">
+            <FieldLabel>{resource?.thumbnail_path ? "Replace preview image" : "Preview image (optional)"}</FieldLabel>
+            <FileDropzone
+              accept="image/*"
+              buttonText={resource?.thumbnail_path ? "Replace Image" : "Upload Image"}
+              file={formState.image}
+              helperText={
+                isAudioUpload
+                  ? "Optional JPG, PNG, WebP, GIF, or AVIF cover image shown on the student audio cards."
+                  : "Optional JPG, PNG, WebP, GIF, or AVIF cover image shown on the student file cards."
+              }
+              label={
+                resource?.thumbnail_path
+                  ? "Replace preview image"
+                  : "Preview image optional"
+              }
+              onFileRemove={() => updateField("image", null)}
+              onFileSelect={(file) => updateField("image", file)}
             />
-            <p className="mt-2 text-xs text-slate-500">
-              {modeText.accepted}
-            </p>
           </div>
-        </label>
+        ) : null}
 
         <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
           <input
@@ -321,6 +683,15 @@ export default function ResourceUploadForm({
             </span>
           </div>
         </label>
+
+        {visibleError ? (
+          <div
+            className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+            role="alert"
+          >
+            {visibleError}
+          </div>
+        ) : null}
 
         <Button type="submit" className="w-full" disabled={isSaving}>
           {isSaving ? (

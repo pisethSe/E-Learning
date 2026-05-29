@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import {
   Calendar,
+  Download,
   FileText,
   Headphones,
   ImagePlus,
@@ -72,10 +73,39 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
+function buildDownloadActivity(downloads = [], days = 7) {
+  const formatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
+  const labels = [];
+
+  for (let index = days - 1; index >= 0; index -= 1) {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - index);
+    labels.push({
+      key: date.toISOString().slice(0, 10),
+      name: formatter.format(date),
+    });
+  }
+
+  const counts = downloads.reduce((accumulator, item) => {
+    const key = item?.downloaded_at ? String(item.downloaded_at).slice(0, 10) : "";
+    if (key) {
+      accumulator[key] = (accumulator[key] || 0) + 1;
+    }
+    return accumulator;
+  }, {});
+
+  return labels.map((item) => ({
+    name: item.name,
+    downloads: counts[item.key] || 0,
+  }));
+}
+
 export default function AnalyticsPage({
   stats,
   resources,
   events,
+  downloads = [],
 }) {
   const summary = getSummary(stats);
   const photoResources = useMemo(() => getPhotoResources(resources), [resources]);
@@ -102,6 +132,10 @@ export default function AnalyticsPage({
   const trendData = useMemo(
     () => buildRecentActivity(resources, events, 7),
     [events, resources],
+  );
+  const downloadTrendData = useMemo(
+    () => buildDownloadActivity(downloads, 7),
+    [downloads],
   );
 
   const keyMetrics = [
@@ -137,6 +171,14 @@ export default function AnalyticsPage({
       color: "text-emerald-600",
       bg: "bg-emerald-50",
     },
+    {
+      title: "Downloads",
+      value: formatCompactNumber(summary.total_downloads || downloads.length),
+      trend: `${summary.downloads_today || 0} today`,
+      icon: Download,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+    },
   ];
 
   return (
@@ -164,7 +206,7 @@ export default function AnalyticsPage({
         </div>
       </Motion.div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         {keyMetrics.map((metric, index) => (
           <Motion.div key={metric.title} variants={itemVariants}>
             <Card animate delay={index * 0.04} className="flex h-full items-center gap-4 p-5">
@@ -324,6 +366,59 @@ export default function AnalyticsPage({
                   <Bar dataKey="resources" name="Study resources" fill="#4f46e5" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="audio" name="Khmer audio" fill="#818cf8" radius={[4, 4, 0, 0]} />
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </Motion.div>
+
+        <Motion.div variants={itemVariants} className="lg:col-span-3">
+          <Card>
+            <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Download Activity</h3>
+                <p className="text-sm text-slate-500">Student file opens recorded over the last 7 days</p>
+              </div>
+              <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600">
+                <Download size={16} className="text-slate-400" />
+                Real clicks
+              </span>
+            </div>
+            <div className="h-[280px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={downloadTrendData}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="analyticsDownloads" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.22} />
+                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#64748b", fontSize: 12 }}
+                    dy={10}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                    tick={{ fill: "#64748b", fontSize: 12 }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="downloads"
+                    name="Downloads"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    fill="url(#analyticsDownloads)"
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </Card>

@@ -18,6 +18,8 @@ export function getSummary(stats) {
     published_resources: 0,
     total_events: 0,
     published_events: 0,
+    total_downloads: 0,
+    downloads_today: 0,
   };
 }
 
@@ -76,29 +78,12 @@ export function isAudioResource(resource) {
   return resource?.file_type === "audio";
 }
 
-function hasImageExtension(value = "") {
-  return /\.(avif|gif|jpe?g|png|webp)$/i.test(String(value).split("?")[0]);
-}
-
 export function isPhotoResource(resource) {
   if (!resource) {
     return false;
   }
 
-  if (resource.file_type === "image" || resource.file_type === "photo") {
-    return true;
-  }
-
-  if (resource.file_type !== "document") {
-    return false;
-  }
-
-  return Boolean(
-    resource.thumbnail_path ||
-      hasImageExtension(resource.file_path) ||
-      hasImageExtension(resource.original_filename) ||
-      hasImageExtension(resource.external_url),
-  );
+  return resource.file_type === "image" || resource.file_type === "photo";
 }
 
 export function isFileResource(resource) {

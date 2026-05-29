@@ -31,6 +31,7 @@ async function request(path, options = {}) {
   try {
     const response = await fetch(buildUrl(path), {
       credentials: "include",
+      cache: "no-store",
       ...options,
       headers: {
         ...(options.headers || {}),
@@ -61,6 +62,20 @@ function appendValue(formData, key, value) {
   formData.append(key, value);
 }
 
+function normalizeExternalUrl(value) {
+  const trimmedValue = String(value || "").trim();
+
+  if (!trimmedValue) {
+    return "";
+  }
+
+  if (/^([a-z][a-z\d+\-.]*:)?\/\//i.test(trimmedValue) || trimmedValue.startsWith("/")) {
+    return trimmedValue;
+  }
+
+  return `https://${trimmedValue}`;
+}
+
 export function resolveAssetUrl(filePath) {
   if (!filePath) {
     return "";
@@ -72,6 +87,18 @@ export function resolveAssetUrl(filePath) {
 
   const normalizedPath = filePath.startsWith("/") ? filePath : `/${filePath}`;
   return `${API_BASE_URL}${normalizedPath}`;
+}
+
+export function resolveAdminResourcePreviewUrl(resource = {}) {
+  if (resource.id) {
+    return buildUrl(`/api/admin/resources/${resource.id}/view`);
+  }
+
+  if (resource.external_url) {
+    return normalizeExternalUrl(resource.external_url);
+  }
+
+  return resolveAssetUrl(resource.file_path);
 }
 
 export function loginAdmin(credentials) {
@@ -86,6 +113,32 @@ export function loginAdmin(credentials) {
 
 export function fetchCurrentAdmin() {
   return request("/api/auth/me");
+}
+
+export function updateCurrentAdmin(payload) {
+  return request("/api/auth/me", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function uploadCurrentAdminAvatar(file) {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  return request("/api/auth/me/avatar", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export function deleteCurrentAdminAvatar() {
+  return request("/api/auth/me/avatar", {
+    method: "DELETE",
+  });
 }
 
 export function logoutAdmin() {
@@ -106,6 +159,70 @@ export function fetchAdminEvents() {
   return request("/api/admin/events");
 }
 
+export function fetchAdminDownloads() {
+  return request("/api/admin/downloads");
+}
+
+export function fetchAdminSettings() {
+  return request("/api/admin/settings");
+}
+
+export function updateAdminSettings(payload) {
+  return request("/api/admin/settings", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+function getFilenameFromContentDisposition(value = "") {
+  const filenameMatch = value.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+  if (!filenameMatch) {
+    return "";
+  }
+
+  try {
+    return decodeURIComponent(filenameMatch[1]);
+  } catch {
+    return filenameMatch[1];
+  }
+}
+
+function triggerBrowserDownload(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function downloadAdminBackup() {
+  const response = await fetch(buildUrl("/api/admin/backup"), {
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    const error = new Error(detail || `Backup failed with status ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  const blob = await response.blob();
+  const filename =
+    getFilenameFromContentDisposition(response.headers.get("content-disposition") || "") ||
+    "grade-a-admin-backup.zip";
+
+  triggerBrowserDownload(blob, filename);
+}
+
 export async function saveAdminResource(payload) {
   const formData = new FormData();
 
@@ -115,11 +232,21 @@ export async function saveAdminResource(payload) {
   appendValue(formData, "subject", payload.subject);
   appendValue(formData, "category", payload.category);
   appendValue(formData, "file_type", payload.file_type);
-  appendValue(formData, "external_url", payload.external_url);
+  appendValue(formData, "external_url", normalizeExternalUrl(payload.external_url));
   appendValue(formData, "is_published", payload.is_published);
 
-  if (payload.file instanceof File) {
+  if (Array.isArray(payload.file)) {
+    payload.file.forEach((file) => {
+      if (file instanceof File) {
+        formData.append("file", file);
+      }
+    });
+  } else if (payload.file instanceof File) {
     formData.append("file", payload.file);
+  }
+
+  if (payload.image instanceof File) {
+    formData.append("image", payload.image);
   }
 
   const path = payload.id

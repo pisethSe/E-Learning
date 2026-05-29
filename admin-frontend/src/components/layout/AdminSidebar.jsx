@@ -4,10 +4,10 @@ import { AnimatePresence, motion as Motion } from "framer-motion";
 import {
   BarChart3,
   ChevronDown,
+  Download,
   FileText,
   Headphones,
   ImagePlus,
-  Layers,
   LayoutDashboard,
   Menu,
   Search,
@@ -56,11 +56,18 @@ const NAV_ITEMS = [
     icon: BarChart3,
   },
   {
+    path: "/download",
+    name: "Download",
+    icon: Download,
+  },
+  {
     path: "/settings",
     name: "Settings",
     icon: Settings,
   },
 ];
+
+const BRAND_LOGO_SRC = "/grade-a-podcast-logo.png";
 
 function isUploadSubItemActive(location, subItem) {
   const legacyTab = subItem.path.split("/").pop();
@@ -77,7 +84,7 @@ function isUploadSubItemActive(location, subItem) {
   );
 }
 
-export default function AdminSidebar({ adminName = "Admin" }) {
+export default function AdminSidebar({ adminName = "Admin", adminAvatarUrl = "" }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isUploadExpanded, setIsUploadExpanded] = useState(true);
   const [navSearch, setNavSearch] = useState("");
@@ -131,8 +138,13 @@ export default function AdminSidebar({ adminName = "Admin" }) {
     <div className="flex h-full flex-col border-r border-slate-200 bg-white">
       <div className="px-6 pb-5 pt-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-violet-100 bg-violet-50 text-violet-700 shadow-sm">
-            <Layers size={20} />
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-violet-100 bg-violet-50 shadow-sm">
+            <img
+              src={BRAND_LOGO_SRC}
+              alt="Grade A logo"
+              className="h-8 w-8 object-contain"
+              draggable="false"
+            />
           </div>
           <div>
             <span className="block text-lg font-bold tracking-tight text-slate-950">
@@ -260,8 +272,12 @@ export default function AdminSidebar({ adminName = "Admin" }) {
       <div className="border-t border-slate-200 p-4">
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-bold text-slate-900 shadow-sm">
-              {initials}
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white text-sm font-bold text-slate-900 shadow-sm">
+              {adminAvatarUrl ? (
+                <img src={adminAvatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-950">{adminName}</p>
@@ -277,8 +293,13 @@ export default function AdminSidebar({ adminName = "Admin" }) {
     <>
       <div className="fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 md:hidden">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-violet-100 bg-violet-50 text-violet-700">
-            <Layers size={16} />
+          <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border border-violet-100 bg-violet-50">
+            <img
+              src={BRAND_LOGO_SRC}
+              alt="Grade A logo"
+              className="h-6 w-6 object-contain"
+              draggable="false"
+            />
           </div>
           <span className="text-lg font-bold text-slate-950">Grade A</span>
         </div>

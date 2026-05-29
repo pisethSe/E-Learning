@@ -1,42 +1,34 @@
 import React from "react";
 import { AnimatePresence, motion as Motion } from "framer-motion";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { FileText, Headphones, ImagePlus, UploadCloud, Video } from "lucide-react";
-import { Card } from "../components/ui/Card";
-import { Button } from "../components/ui/Button";
+import { FileText, Headphones, ImagePlus, Video } from "lucide-react";
 import EventsPage from "./EventsPage";
 import ResourcesPage from "./ResourcesPage";
 
 const tabs = [
   {
-    id: "photo",
-    label: "Image Files",
-    icon: ImagePlus,
-    color: "text-sky-600",
-    border: "border-sky-200 bg-sky-50/50",
-    button: "bg-sky-600 hover:bg-sky-700",
-    title: "Upload Image Files",
-    copy: "Add scanned pages, diagrams, and image-based study materials. Students see them together with files and can filter by category.",
-    buttonLabel: "Open Image Form",
-  },
-  {
     id: "file",
     label: "Files",
     icon: FileText,
     color: "text-primary-600",
-    border: "border-primary-200 bg-primary-50/50",
-    button: "bg-primary-600 hover:bg-primary-700",
     title: "Upload Files",
     copy: "Add answer keys, formulas, exam papers, documents, presentations, spreadsheets, and e-books.",
     buttonLabel: "Open File Form",
+  },
+  {
+    id: "photo",
+    label: "Image Files",
+    icon: ImagePlus,
+    color: "text-sky-600",
+    title: "Upload Image Files",
+    copy: "Add scanned pages, diagrams, and image-based study materials. Students see them together with files and can filter by category.",
+    buttonLabel: "Open Image Form",
   },
   {
     id: "audio",
     label: "Audio",
     icon: Headphones,
     color: "text-indigo-600",
-    border: "border-indigo-200 bg-indigo-50/50",
-    button: "bg-indigo-600 hover:bg-indigo-700",
     title: "Upload Khmer Literature Audio",
     copy: "Story audio files for Khmer Literature essay writing and revision.",
     buttonLabel: "Open Audio Form",
@@ -46,8 +38,6 @@ const tabs = [
     label: "Event Videos",
     icon: Video,
     color: "text-emerald-600",
-    border: "border-emerald-200 bg-emerald-50/50",
-    button: "bg-emerald-600 hover:bg-emerald-700",
     title: "Upload Event Videos",
     copy: "Publish event videos with dates, locations, and registration links.",
     buttonLabel: "Open Event Form",
@@ -69,7 +59,7 @@ function resolveUploadTab(value) {
     return normalized;
   }
 
-  return "photo";
+  return "file";
 }
 
 export default function UploadPage({
@@ -78,6 +68,7 @@ export default function UploadPage({
   isLoading,
   isSavingResource,
   isSavingEvent,
+  resourceErrorMessage = "",
   onSaveResource,
   onDeleteResource,
   onSaveEvent,
@@ -87,8 +78,6 @@ export default function UploadPage({
   const { tab } = useParams();
   const [searchParams] = useSearchParams();
   const activeTab = resolveUploadTab(tab || searchParams.get("tab"));
-  const activeTabData = tabs.find((tabItem) => tabItem.id === activeTab) || tabs[0];
-  const ActiveIcon = activeTabData.icon;
 
   function handleTabChange(tabId) {
     navigate(`/upload/${tabId}`);
@@ -131,34 +120,6 @@ export default function UploadPage({
         </div>
       </div>
 
-      <Card className={`border-2 border-dashed transition-colors duration-300 ${activeTabData.border}`}>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-slate-100 bg-white shadow-sm">
-            <ActiveIcon size={32} className={activeTabData.color} />
-          </div>
-
-          <h3 className="text-lg font-semibold text-slate-900">
-            {activeTabData.title}
-          </h3>
-          <p className="mb-6 mt-2 max-w-md text-sm text-slate-500">
-            {activeTabData.copy}
-          </p>
-
-          <Button
-            className={activeTabData.button}
-            onClick={() =>
-              window.scrollTo({
-                top: 420,
-                behavior: "smooth",
-              })
-            }
-          >
-            <UploadCloud size={18} className="mr-2" />
-            {activeTabData.buttonLabel}
-          </Button>
-        </div>
-      </Card>
-
       <AnimatePresence mode="wait">
         <Motion.div
           key={activeTab}
@@ -175,6 +136,7 @@ export default function UploadPage({
               isSaving={isSavingResource}
               onSave={onSaveResource}
               onDelete={onDeleteResource}
+              errorMessage={resourceErrorMessage}
             />
           ) : activeTab === "file" ? (
             <ResourcesPage
@@ -184,6 +146,7 @@ export default function UploadPage({
               isSaving={isSavingResource}
               onSave={onSaveResource}
               onDelete={onDeleteResource}
+              errorMessage={resourceErrorMessage}
             />
           ) : activeTab === "audio" ? (
             <ResourcesPage
@@ -193,6 +156,7 @@ export default function UploadPage({
               isSaving={isSavingResource}
               onSave={onSaveResource}
               onDelete={onDeleteResource}
+              errorMessage={resourceErrorMessage}
             />
           ) : (
             <EventsPage

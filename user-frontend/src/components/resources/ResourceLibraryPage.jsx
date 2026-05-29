@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
   Download,
@@ -9,8 +9,11 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import {
+  LIVE_DATA_REFRESH_MS,
+  downloadResourceFile,
   fetchResources,
   resolveFileUrl,
+  resolveResourceDownloadUrl,
   resolveResourceUrl,
 } from "@/services/api";
 import {
@@ -69,7 +72,8 @@ function toDisplayResource(resource, language) {
   return {
     ...resource,
     category,
-    fileUrl: resolveResourceUrl(resource),
+    downloadUrl: resolveResourceDownloadUrl(resource),
+    openUrl: resolveResourceUrl(resource),
     thumbnailUrl: resource.thumbnail_path
       ? resolveFileUrl(resource.thumbnail_path)
       : resource.file_type === "image"
@@ -92,16 +96,16 @@ function ResourceThumb({ resource }) {
         alt={resource.title}
         loading="lazy"
         decoding="async"
-        className="h-24 w-24 rounded-2xl border border-black/10 object-cover shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
+        className="h-14 w-14 rounded-[0.9rem] border border-black/10 object-cover shadow-[0_14px_34px_rgba(15,23,42,0.08)] sm:h-16 sm:w-16 sm:rounded-[1.05rem]"
       />
     );
   }
 
   return (
     <div
-      className={`flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border border-black/10 bg-gradient-to-br ${resource.category.accent} text-white shadow-[0_14px_34px_rgba(15,23,42,0.08)]`}
+      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-[0.9rem] border border-black/10 bg-gradient-to-br ${resource.category.accent} text-white shadow-[0_14px_34px_rgba(15,23,42,0.08)] sm:h-16 sm:w-16 sm:rounded-[1.05rem]`}
     >
-      <FileText className="h-9 w-9" />
+      <FileText className="h-6 w-6" />
     </div>
   );
 }
@@ -120,48 +124,74 @@ export default function ResourceLibraryPage({
   const [selectedGrade, setSelectedGrade] = useState("all");
   const [selectedSubject, setSelectedSubject] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [sortOrder, setSortOrder] = useState("newest");
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
   const isKhmer = language === "km";
 
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    async function loadResources() {
+  const loadResources = useCallback(
+    async ({ signal, showLoading = false } = {}) => {
       try {
-        setLoading(true);
-        setHasError(false);
+        if (showLoading) {
+          setLoading(true);
+        }
 
         const params = {
           grade: fixedGrade,
           subject: fixedSubject,
         };
-        const data = await fetchResources(params, {
-          signal: abortController.signal,
-        });
+        const data = await fetchResources(params, { signal });
+
+        if (signal?.aborted) {
+          return;
+        }
 
         setResources(Array.isArray(data) ? data : []);
+        setHasError(false);
+        setLoading(false);
       } catch (error) {
         if (error?.name === "AbortError") {
           return;
         }
 
-        setHasError(true);
-        setResources([]);
-      } finally {
-        if (!abortController.signal.aborted) {
+        if (showLoading) {
+          setHasError(true);
+          setResources([]);
           setLoading(false);
         }
       }
-    }
+    },
+    [fixedGrade, fixedSubject],
+  );
 
-    loadResources();
+  useEffect(() => {
+    let abortController = new AbortController();
+
+    const refreshResources = (showLoading = false) => {
+      abortController.abort();
+      abortController = new AbortController();
+      void loadResources({
+        signal: abortController.signal,
+        showLoading,
+      });
+    };
+
+    refreshResources(true);
+
+    const intervalId = window.setInterval(
+      () => refreshResources(false),
+      LIVE_DATA_REFRESH_MS,
+    );
+    const handleFocus = () => refreshResources(false);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       abortController.abort();
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
     };
-  }, [fixedGrade, fixedSubject]);
+  }, [loadResources]);
 
   const preparedResources = useMemo(() => {
     return resources
@@ -212,6 +242,15 @@ export default function ResourceLibraryPage({
       .sort((left, right) => {
         const leftTime = new Date(left.created_at || 0).getTime();
         const rightTime = new Date(right.created_at || 0).getTime();
+
+        if (sortOrder === "oldest") {
+          return leftTime - rightTime || khmerCollator.compare(left.title, right.title);
+        }
+
+        if (sortOrder === "title") {
+          return khmerCollator.compare(left.title, right.title);
+        }
+
         return rightTime - leftTime || khmerCollator.compare(left.title, right.title);
       });
   }, [
@@ -222,6 +261,7 @@ export default function ResourceLibraryPage({
     selectedCategory,
     effectiveSelectedSubject,
     selectedGrade,
+    sortOrder,
   ]);
 
   const activeCategory =
@@ -232,6 +272,12 @@ export default function ResourceLibraryPage({
     setSelectedGrade("all");
     setSelectedSubject("all");
     setSelectedCategory("all");
+    setSortOrder("newest");
+  };
+
+  const handleDownload = (event, resource) => {
+    event.stopPropagation();
+    void downloadResourceFile(resource);
   };
 
   return (
@@ -241,7 +287,11 @@ export default function ResourceLibraryPage({
           <div className="border-b border-black/10 px-5 py-7 sm:px-7 lg:px-10">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] lg:items-end">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-black/55 shadow-sm">
+                <div
+                  className={`inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-black/55 shadow-sm ${
+                    isKhmer ? "tracking-normal" : "uppercase tracking-[0.24em]"
+                  }`}
+                >
                   <BookOpen className="h-3.5 w-3.5" />
                   {eyebrow || (isKhmer ? "បណ្ណាល័យឯកសារ" : "Resource library")}
                 </div>
@@ -255,7 +305,11 @@ export default function ResourceLibraryPage({
 
               <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
                 <div className="rounded-2xl border border-black/10 bg-white/92 p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
+                  <p
+                    className={`text-xs font-semibold text-black/45 ${
+                      isKhmer ? "tracking-normal" : "uppercase tracking-[0.18em]"
+                    }`}
+                  >
                     {isKhmer ? "លទ្ធផល" : "Results"}
                   </p>
                   <p className="mt-3 text-3xl font-bold text-black">
@@ -266,7 +320,11 @@ export default function ResourceLibraryPage({
                   </p>
                 </div>
                 <div className="rounded-2xl border border-black/10 bg-white/92 p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
+                  <p
+                    className={`text-xs font-semibold text-black/45 ${
+                      isKhmer ? "tracking-normal" : "uppercase tracking-[0.18em]"
+                    }`}
+                  >
                     {isKhmer ? "ប្រភេទ" : "Category"}
                   </p>
                   <p className="mt-3 text-lg font-bold text-black">
@@ -280,7 +338,11 @@ export default function ResourceLibraryPage({
                   </p>
                 </div>
                 <div className="rounded-2xl border border-black/10 bg-white/92 p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
+                  <p
+                    className={`text-xs font-semibold text-black/45 ${
+                      isKhmer ? "tracking-normal" : "uppercase tracking-[0.18em]"
+                    }`}
+                  >
                     {isKhmer ? "ប្រភព" : "Source"}
                   </p>
                   <p className="mt-3 text-lg font-bold text-black">Admin</p>
@@ -293,7 +355,7 @@ export default function ResourceLibraryPage({
           </div>
 
           <div className="px-5 py-6 sm:px-7 lg:px-10">
-            <div className="grid gap-3 rounded-2xl border border-black/10 bg-[#f7f8f9] p-3 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 rounded-2xl border border-black/10 bg-[#f7f8f9] p-3 md:grid-cols-2 lg:grid-cols-5">
               <label className="relative block">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-black/45" />
                 <input
@@ -358,6 +420,18 @@ export default function ResourceLibraryPage({
                       {isKhmer ? category.labelKm : category.labelEn}
                     </option>
                   ))}
+                </select>
+              </label>
+
+              <label className="relative block">
+                <select
+                  value={sortOrder}
+                  onChange={(event) => setSortOrder(event.target.value)}
+                  className="h-12 w-full appearance-none rounded-xl border border-black/10 bg-white px-4 text-sm text-black outline-none focus:border-black/25"
+                >
+                  <option value="newest">{isKhmer ? "ថ្មីទៅចាស់" : "Newest first"}</option>
+                  <option value="oldest">{isKhmer ? "ចាស់ទៅថ្មី" : "Oldest first"}</option>
+                  <option value="title">{isKhmer ? "តាមចំណងជើង" : "Title A-Z"}</option>
                 </select>
               </label>
             </div>
@@ -425,48 +499,57 @@ export default function ResourceLibraryPage({
                 filteredResources.map((resource) => (
                   <article
                     key={resource.id}
-                    className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.05)] transition-all hover:-translate-y-0.5 hover:border-black/15 md:p-5"
+                    className="relative cursor-pointer rounded-2xl border border-black/10 bg-white p-2.5 shadow-[0_12px_32px_rgba(15,23,42,0.05)] transition-all hover:-translate-y-0.5 hover:border-black/15 sm:p-3"
                   >
-                    <div className="grid gap-4 md:grid-cols-[96px,1fr]">
+                    {resource.openUrl ? (
+                      <a
+                        href={resource.openUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Open ${resource.title}`}
+                        className="absolute inset-0 z-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-black/15"
+                      />
+                    ) : null}
+
+                    <div className="pointer-events-none relative z-10 grid grid-cols-[56px,1fr] gap-3 sm:grid-cols-[64px,1fr]">
                       <ResourceThumb resource={resource} />
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-black px-3 py-1 text-xs font-semibold text-white">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-full bg-black px-2.5 py-0.5 text-[11px] font-semibold text-white">
                             {isKhmer
                               ? resource.category.labelKm
                               : resource.category.labelEn}
                           </span>
-                          <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-3 py-1 text-xs font-medium text-black/65">
+                          <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-2.5 py-0.5 text-[11px] font-medium text-black/65">
                             {resource.subjectLabel}
                           </span>
-                          <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-3 py-1 text-xs font-medium text-black/65">
+                          <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-2.5 py-0.5 text-[11px] font-medium text-black/65">
                             {resource.gradeLabel}
                           </span>
                         </div>
 
-                        <h2 className="mt-3 text-xl font-bold leading-snug text-black md:text-2xl">
+                        <h2 className="mt-2 text-sm font-bold leading-snug text-black sm:text-base">
                           {resource.title}
                         </h2>
                         {resource.description ? (
-                          <p className="mt-2 text-sm leading-7 text-black/62 md:text-[15px]">
+                          <p className="mt-1 line-clamp-2 text-xs leading-5 text-black/62 sm:text-sm">
                             {resource.description}
                           </p>
                         ) : null}
 
-                        <div className="mt-4 flex flex-wrap items-center gap-3">
-                          {resource.fileUrl ? (
-                            <a
-                              href={resource.fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-black px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-black hover:text-white sm:w-auto"
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {resource.downloadUrl ? (
+                            <button
+                              type="button"
+                              onClick={(event) => handleDownload(event, resource)}
+                              className="pointer-events-auto inline-flex items-center justify-center gap-1.5 rounded-full border border-black px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-black hover:text-white"
                             >
-                              <Download className="h-4 w-4" />
-                              {isKhmer ? "បើកឯកសារ" : "Open file"}
-                            </a>
+                              <Download className="h-3.5 w-3.5" />
+                              Download
+                            </button>
                           ) : null}
                           {resource.createdAtLabel ? (
-                            <span className="text-xs font-medium text-black/45">
+                            <span className="text-[11px] font-medium text-black/45 sm:text-xs">
                               {isKhmer
                                 ? `បានបន្ថែម ${resource.createdAtLabel}`
                                 : `Added ${resource.createdAtLabel}`}

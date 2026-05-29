@@ -1,0 +1,75 @@
+services:
+  - type: web
+    name: e-learning-grade-a-api
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 30
+      - key: AUTH_COOKIE_NAME
+        value: grade_a_admin_token
+      - key: AUTH_COOKIE_SECURE
+        value: true
+      - key: AUTH_COOKIE_SAMESITE
+        value: none
+      - key: FRONTEND_ORIGINS
+        value: https://e-learning-grade-a.onrender.com,https://e-learning-grade-a-admin.onrender.com
+      - key: ADMIN_BOOTSTRAP_ACCOUNTS
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHANNEL_USERNAME
+        value: bacii26w
+      - key: STORAGE_BACKEND
+        value: cloudinary
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_UPLOAD_FOLDER
+        value: e-learning-grade-a
+
+  - type: web
+    name: e-learning-grade-a
+    runtime: static
+    buildCommand: npm ci --prefix user-frontend && npm run build --prefix user-frontend
+    staticPublishPath: ./user-frontend/dist
+    autoDeployTrigger: commit
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://e-learning-grade-a-api.onrender.com
+
+  - type: web
+    name: e-learning-grade-a-admin
+    runtime: static
+    buildCommand: npm ci --prefix admin-frontend && npm run build --prefix admin-frontend
+    staticPublishPath: ./admin-frontend/dist
+    autoDeployTrigger: commit
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://e-learning-grade-a-api.onrender.com

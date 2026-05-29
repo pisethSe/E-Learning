@@ -39,11 +39,40 @@ Backend setup:
 1. Copy `backend/.env.example` to `backend/.env`.
 2. Set `DATABASE_URL` to your Neon PostgreSQL URL, or keep `sqlite:///./e-learning.db` for local development.
 3. Set `SECRET_KEY` to a long random value.
-4. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` once to bootstrap the first admin account.
+4. Set `ADMIN_BOOTSTRAP_ACCOUNTS` once to bootstrap one or more admin accounts, or use `ADMIN_EMAIL` and `ADMIN_PASSWORD` for a single admin.
 5. Run migrations from the project root with `npm run db:migrate`.
 6. Start the API with `npm run dev:backend`.
+
+Render deployment:
+
+1. Push this repository to GitHub.
+2. In Render, create a new Blueprint from this repository.
+3. Render will read `render.yaml` and create:
+   - `e-learning-grade-a-api`
+   - `e-learning-grade-a`
+   - `e-learning-grade-a-admin`
+4. Fill the secret values Render asks for:
+   - `DATABASE_URL`
+   - `ADMIN_BOOTSTRAP_ACCOUNTS`
+   - `TELEGRAM_BOT_TOKEN`
+   - `CLOUDINARY_CLOUD_NAME`
+   - `CLOUDINARY_API_KEY`
+   - `CLOUDINARY_API_SECRET`
+5. After the first deploy, open `/health` on the API service and confirm it returns `{"status":"healthy"}`.
 
 Cloudinary setup:
 
 1. Set `STORAGE_BACKEND=cloudinary`.
 2. Add your Cloudinary credentials with either `CLOUDINARY_URL` or `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`.
+
+Default admin emails:
+
+- `admin@gradea.local`
+- `content@gradea.local`
+- `support@gradea.local`
+
+Admin passwords live in `backend/.env`.
+
+npm run dev:backend
+npm run dev
+npm run dev

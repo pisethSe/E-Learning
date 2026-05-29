@@ -53,6 +53,7 @@ const cardIcons = [BookOpen, Headphones, Layers3];
 
 export default function AboutPage({ language = "km" }) {
   const content = aboutContent[language] ?? aboutContent.km;
+  const isKhmer = language === "km";
 
   return (
     <>
@@ -79,7 +80,11 @@ export default function AboutPage({ language = "km" }) {
 
               <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)] lg:items-end">
                 <div className="max-w-3xl">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-black/55 shadow-sm">
+                  <div
+                    className={`inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3 py-1.5 text-xs font-semibold text-black/55 shadow-sm ${
+                      isKhmer ? "tracking-normal" : "uppercase tracking-[0.24em]"
+                    }`}
+                  >
                     <Sparkles className="h-3.5 w-3.5" />
                     {content.eyebrow}
                   </div>
@@ -94,7 +99,7 @@ export default function AboutPage({ language = "km" }) {
                 </div>
 
                 <div className="rounded-[1.6rem] border border-black/10 bg-[#f8fafc] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-black/42">
+                  <p className="text-xs font-semibold uppercase tracking-normal text-black/42">
                     Grade A
                   </p>
                   <p className="mt-4 text-3xl font-bold tracking-tight text-black">

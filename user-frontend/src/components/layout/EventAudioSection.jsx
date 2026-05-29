@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  CalendarDays,
   Headphones,
   LoaderCircle,
   Mic2,
   Sparkles,
   Volume2,
 } from "lucide-react";
-import AudioPlayer from "@/components/resources/AudioPlayer";
-import { fetchResources, resolveResourceUrl } from "@/services/api";
+import LiquidAudioCard from "@/components/resources/LiquidAudioCard";
+import {
+  LIVE_DATA_REFRESH_MS,
+  fetchResources,
+  resolveFileUrl,
+} from "@/services/api";
 import {
   AUDIO_SUBJECT,
   extractKhmerText,
@@ -32,9 +35,32 @@ function formatCreatedAt(value, language = "km") {
   }).format(date);
 }
 
+function normalizeAudioUrl(value) {
+  const trimmedValue = String(value || "").trim();
+
+  if (!trimmedValue || /^https?:\/\/(www\.)?example\.com\//i.test(trimmedValue)) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmedValue) || trimmedValue.startsWith("/")) {
+    return trimmedValue;
+  }
+
+  return `https://${trimmedValue}`;
+}
+
+function getAudioPlaybackUrl(resource) {
+  if (resource.file_path) {
+    return resolveFileUrl(resource.file_path);
+  }
+
+  return normalizeAudioUrl(resource.external_url);
+}
+
 function toDisplayAudio(resource, language = "km") {
   const khmerTitle = extractKhmerText(resource.title);
   const khmerDescription = extractKhmerText(resource.description);
+  const fileUrl = getAudioPlaybackUrl(resource);
 
   return {
     ...resource,
@@ -55,59 +81,93 @@ function toDisplayAudio(resource, language = "km") {
         ? `ថ្នាក់ទី ${resource.grade_level}`
         : `Grade ${resource.grade_level}`,
     createdAtLabel: formatCreatedAt(resource.created_at, language),
-    fileUrl: resolveResourceUrl(resource),
+    fileUrl,
+    coverUrl: resource.thumbnail_path
+      ? resolveFileUrl(resource.thumbnail_path)
+      : "/logo.png",
   };
 }
 
 export default function EventAudioSection({ language = "km" }) {
   const [audioItems, setAudioItems] = useState([]);
+  const [activeAudioId, setActiveAudioId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
   const isKhmer = language === "km";
 
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    async function loadAudioResources() {
+  const loadAudioResources = useCallback(
+    async ({ signal, showLoading = false } = {}) => {
       try {
-        setLoading(true);
-        setHasError(false);
+        if (showLoading) {
+          setLoading(true);
+        }
+
         const data = await fetchResources(
           { file_type: "audio", subject: AUDIO_SUBJECT },
-          { signal: abortController.signal },
+          { signal },
         );
 
+        if (signal?.aborted) {
+          return;
+        }
+
         const items = Array.isArray(data)
-          ? data.map((resource) => toDisplayAudio(resource, language))
+          ? data
+              .map((resource) => toDisplayAudio(resource, language))
+              .filter((item) => item.fileUrl)
           : [];
 
         setAudioItems(items);
+        setHasError(false);
+        setLoading(false);
       } catch (error) {
         if (error?.name === "AbortError") {
           return;
         }
 
-        setHasError(true);
-        setAudioItems([]);
-      } finally {
-        if (!abortController.signal.aborted) {
+        if (showLoading) {
+          setHasError(true);
+          setAudioItems([]);
           setLoading(false);
         }
       }
-    }
+    },
+    [language],
+  );
 
-    loadAudioResources();
+  useEffect(() => {
+    let abortController = new AbortController();
+
+    const refreshAudioResources = (showLoading = false) => {
+      abortController.abort();
+      abortController = new AbortController();
+      void loadAudioResources({
+        signal: abortController.signal,
+        showLoading,
+      });
+    };
+
+    refreshAudioResources(true);
+
+    const intervalId = window.setInterval(
+      () => refreshAudioResources(false),
+      LIVE_DATA_REFRESH_MS,
+    );
+    const handleFocus = () => refreshAudioResources(false);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       abortController.abort();
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
     };
-  }, [language]);
+  }, [loadAudioResources]);
 
   return (
     <section
       id="event"
-      className="relative scroll-mt-24 overflow-hidden border-t border-black/10 bg-[#f8fafc] py-6 md:py-10 lg:py-12"
+      className="relative scroll-mt-24 overflow-hidden border-t border-black/10 bg-white py-6 md:py-10 lg:py-12"
     >
       <div
         className="pointer-events-none absolute inset-0 z-0"
@@ -132,7 +192,7 @@ export default function EventAudioSection({ language = "km" }) {
       />
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 md:px-8 lg:px-10 xl:px-16">
-        <div className="overflow-hidden rounded-[2rem] border border-black/10 bg-white/82 shadow-[0_28px_90px_rgba(15,23,42,0.08)] backdrop-blur-sm">
+        <div className="overflow-hidden rounded-[2rem] border border-black/10 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.08)]">
           <div className="relative border-b border-black/10 px-5 py-7 md:px-7 md:py-8 lg:px-8">
             <div
               className="pointer-events-none absolute inset-0 opacity-75"
@@ -148,12 +208,20 @@ export default function EventAudioSection({ language = "km" }) {
 
             <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)] lg:items-end">
               <div className="max-w-3xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-black/55 shadow-sm">
+                <div
+                  className={`inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/90 px-3 py-1.5 text-xs font-semibold text-black/55 shadow-sm ${
+                    isKhmer ? "tracking-normal" : "uppercase tracking-[0.24em]"
+                  }`}
+                >
                   <Sparkles className="h-3.5 w-3.5" />
                   {isKhmer ? "សំឡេងអក្សរសាស្ត្រខ្មែរ" : "Khmer Literature Audio"}
                 </div>
 
-                <p className="mt-5 text-sm font-semibold uppercase tracking-[0.26em] text-black/42">
+                <p
+                  className={`mt-5 text-sm font-semibold text-black/42 ${
+                    isKhmer ? "tracking-normal" : "uppercase tracking-[0.26em]"
+                  }`}
+                >
                   {isKhmer ? "សម្រាប់តែងសេចក្ដី" : "For essay writing"}
                 </p>
 
@@ -180,7 +248,11 @@ export default function EventAudioSection({ language = "km" }) {
                 <div className="rounded-[1.4rem] border border-black/10 bg-white/90 p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
                   <div className="flex items-center gap-2 text-black/45">
                     <Headphones className="h-4 w-4" />
-                    <span className="text-xs font-semibold uppercase tracking-[0.18em]">
+                    <span
+                      className={`text-xs font-semibold ${
+                        isKhmer ? "tracking-normal" : "uppercase tracking-[0.18em]"
+                      }`}
+                    >
                       {isKhmer ? "សរុប" : "Total"}
                     </span>
                   </div>
@@ -195,7 +267,11 @@ export default function EventAudioSection({ language = "km" }) {
                 <div className="rounded-[1.4rem] border border-black/10 bg-white/90 p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
                   <div className="flex items-center gap-2 text-black/45">
                     <Mic2 className="h-4 w-4" />
-                    <span className="text-xs font-semibold uppercase tracking-[0.18em]">
+                    <span
+                      className={`text-xs font-semibold ${
+                        isKhmer ? "tracking-normal" : "uppercase tracking-[0.18em]"
+                      }`}
+                    >
                       {isKhmer ? "ប្រភព" : "Source"}
                     </span>
                   </div>
@@ -203,14 +279,18 @@ export default function EventAudioSection({ language = "km" }) {
                     {isKhmer ? "Admin library" : "Admin library"}
                   </p>
                   <p className="mt-1 text-sm text-black/55">
-                    {isKhmer ? "sync ពី backend" : "synced from backend"}
+                    {isKhmer ? "sync ពី dashboard" : "dashboard sync"}
                   </p>
                 </div>
 
                 <div className="rounded-[1.4rem] border border-black/10 bg-white/90 p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
                   <div className="flex items-center gap-2 text-black/45">
                     <Volume2 className="h-4 w-4" />
-                    <span className="text-xs font-semibold uppercase tracking-[0.18em]">
+                    <span
+                      className={`text-xs font-semibold ${
+                        isKhmer ? "tracking-normal" : "uppercase tracking-[0.18em]"
+                      }`}
+                    >
                       {isKhmer ? "បទពិសោធន៍" : "Experience"}
                     </span>
                   </div>
@@ -238,14 +318,9 @@ export default function EventAudioSection({ language = "km" }) {
                 </p>
               </div>
 
-              <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-[#f8fafc] px-4 py-2 text-sm font-medium text-black/65">
-                {isKhmer
-                  ? "ទិន្នន័យពី admin backend"
-                  : "Powered by the admin backend"}
-              </div>
             </div>
 
-            <div className="grid gap-4">
+            <div className="grid gap-3">
               {loading &&
                 Array.from({ length: 3 }).map((_, index) => (
                   <div
@@ -288,52 +363,29 @@ export default function EventAudioSection({ language = "km" }) {
                 audioItems.map((item) => (
                   <article
                     key={item.id}
-                    className="overflow-hidden rounded-[1.65rem] border border-black/10 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-black/15 hover:shadow-[0_18px_44px_rgba(15,23,42,0.08)]"
+                    className="transition-transform duration-300 hover:-translate-y-0.5"
                   >
-                    <div className="grid gap-5 p-5 md:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.88fr)] lg:items-start">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-black px-3 py-1 text-xs font-semibold text-white shadow-sm">
-                            {item.gradeLabel}
-                          </span>
-                          <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-3 py-1 text-xs font-medium text-black/65">
-                            {item.subjectLabel}
-                          </span>
-                          <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-3 py-1 text-xs font-medium text-black/65">
-                            Audio
-                          </span>
-                        </div>
-
-                        <h4 className="mt-4 text-xl font-bold leading-snug text-black md:text-2xl">
-                          {item.title}
-                        </h4>
-
-                        <p className="mt-3 max-w-3xl text-sm leading-7 text-black/62 md:text-[15px]">
-                          {item.description}
-                        </p>
-
-                        <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-black/48">
-                          {item.createdAtLabel ? (
-                            <span className="inline-flex items-center gap-2">
-                              <CalendarDays className="h-4 w-4" />
-                              {isKhmer
-                                ? `បានបន្ថែម ${item.createdAtLabel}`
-                                : `Added ${item.createdAtLabel}`}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="rounded-[1.4rem] border border-black/10 bg-[#fbfcfd] p-3">
-                        <AudioPlayer
-                          src={item.fileUrl}
-                          title={
-                            isKhmer ? "ចាក់សំឡេងមេរៀន" : "Play lesson audio"
-                          }
-                          className="border-0 bg-transparent p-0 shadow-none"
-                        />
-                      </div>
-                    </div>
+                    <LiquidAudioCard
+                      src={item.fileUrl}
+                      title={item.title}
+                      artist={`${item.gradeLabel} · ${item.subjectLabel}`}
+                      description={item.description}
+                      coverUrl={item.coverUrl}
+                      isActive={activeAudioId === item.id}
+                      onActivate={() => setActiveAudioId(item.id)}
+                      onDeactivate={() =>
+                        setActiveAudioId((currentId) =>
+                          currentId === item.id ? null : currentId,
+                        )
+                      }
+                      createdAtLabel={
+                        item.createdAtLabel
+                          ? isKhmer
+                            ? `បានបន្ថែម ${item.createdAtLabel}`
+                            : `Added ${item.createdAtLabel}`
+                          : ""
+                      }
+                    />
                   </article>
                 ))}
             </div>

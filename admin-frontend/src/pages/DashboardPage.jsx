@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   CalendarRange,
   CheckCircle2,
+  Download,
   FileText,
   Filter,
   Headphones,
@@ -197,6 +198,7 @@ export default function DashboardPage({
   stats,
   resources,
   events,
+  downloads = [],
   isLoading,
 }) {
   const [rangeId, setRangeId] = useState("12m");
@@ -217,6 +219,8 @@ export default function DashboardPage({
     summary.published_resources || getPublishedItems(resources).length;
   const totalEvents = summary.total_events || events.length;
   const publishedEvents = summary.published_events || getPublishedItems(events).length;
+  const totalDownloads = summary.total_downloads || downloads.length;
+  const downloadsToday = summary.downloads_today || 0;
   const chartTotal = trendData.reduce(
     (total, item) => total + item.resources + item.events,
     0,
@@ -269,10 +273,17 @@ export default function DashboardPage({
     },
     {
       title: "Event videos",
-      value: formatNumber(health.videoEvents.length || totalEvents),
+      value: formatNumber(totalEvents),
       detail: `${publishedEvents} published`,
       icon: Video,
       to: "/upload/events",
+    },
+    {
+      title: "Downloads",
+      value: formatNumber(totalDownloads),
+      detail: `${formatNumber(downloadsToday)} today`,
+      icon: Download,
+      to: "/download",
     },
   ];
 
@@ -306,7 +317,7 @@ export default function DashboardPage({
       animate="show"
       className="space-y-6"
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         {statCards.map((stat, index) => (
           <Motion.div key={stat.title} variants={itemVariants}>
             <Link to={stat.to}>

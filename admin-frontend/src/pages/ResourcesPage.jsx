@@ -9,6 +9,7 @@ export default function ResourcesPage({
   isSaving,
   onSave,
   onDelete,
+  errorMessage = "",
 }) {
   const [editingResource, setEditingResource] = useState(null);
 
@@ -34,6 +35,7 @@ export default function ResourcesPage({
         onSubmit={handleSave}
         onCancel={() => setEditingResource(null)}
         isSaving={isSaving}
+        errorMessage={errorMessage}
       />
 
       <ResourceTable

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CalendarPlus2, Save } from "lucide-react";
+import { CalendarPlus2, Pencil, Save, Trash2 } from "lucide-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { resolveAssetUrl } from "../services/api";
@@ -310,15 +310,24 @@ function EventList({ events, onEdit, onDelete, isLoading }) {
                   </div>
 
                   <div className="mt-5 flex flex-wrap gap-3">
-                    <Button variant="outline" size="sm" onClick={() => onEdit(event)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => onEdit(event)}
+                    >
+                      <Pencil size={14} />
                       Edit
                     </Button>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
-                      className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                      onClick={() => onDelete(event.id)}
+                      className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => onDelete(event)}
                     >
+                      <Trash2 size={14} />
                       Delete
                     </Button>
                   </div>

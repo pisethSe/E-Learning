@@ -1,15 +1,17 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Download,
   FolderSearch,
   LoaderCircle,
   Search,
-  Send,
   SlidersHorizontal,
 } from "lucide-react";
 import {
+  LIVE_DATA_REFRESH_MS,
+  downloadResourceFile,
   fetchResources,
   resolveFileUrl,
+  resolveResourceDownloadUrl,
   resolveResourceUrl,
 } from "@/services/api";
 import {
@@ -20,11 +22,14 @@ import {
   inferResourceCategory,
   normalizeText,
 } from "@/data/learningCatalog";
+import Pagination from "@/components/Pagination";
 
 const khmerCollator = new Intl.Collator("km", {
   numeric: true,
   sensitivity: "base",
 });
+
+const FILES_PER_PAGE = 8;
 
 const sectionTextureStyle = {
   backgroundImage: `
@@ -133,7 +138,8 @@ function toDisplayResource(resource, language = "km") {
     gradeLabelKm: `ថ្នាក់ទី ${resource.grade_level}`,
     gradeLabelEn: `Grade ${resource.grade_level}`,
     createdAtLabel: formatCreatedAt(resource.created_at),
-    fileUrl: resolveResourceUrl(resource),
+    downloadUrl: resolveResourceDownloadUrl(resource),
+    openUrl: resolveResourceUrl(resource),
     thumbnailUrl: resource.thumbnail_path
       ? resolveFileUrl(resource.thumbnail_path)
       : resource.file_type === "image"
@@ -146,7 +152,7 @@ function toDisplayResource(resource, language = "km") {
 function ResourcePreview({ category, gradeLabel, thumbnailUrl, title }) {
   if (thumbnailUrl) {
     return (
-      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[1.25rem] border border-black/10 bg-white shadow-[0_16px_36px_rgba(15,23,42,0.10)] sm:h-24 sm:w-24 sm:rounded-[1.45rem]">
+      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-black/10 bg-white shadow-[0_12px_24px_rgba(15,23,42,0.08)] sm:h-16 sm:w-16 sm:rounded-[1.05rem] sm:shadow-[0_16px_36px_rgba(15,23,42,0.10)]">
         <img
           src={thumbnailUrl}
           alt={title}
@@ -154,7 +160,7 @@ function ResourcePreview({ category, gradeLabel, thumbnailUrl, title }) {
           loading="lazy"
           className="h-full w-full object-cover"
         />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent px-1 py-1 text-[8px] font-semibold leading-none text-white sm:px-1.5 sm:py-1.5 sm:text-[9px]">
           {gradeLabel}
         </div>
       </div>
@@ -163,18 +169,20 @@ function ResourcePreview({ category, gradeLabel, thumbnailUrl, title }) {
 
   return (
     <div
-      className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-[1.25rem] border border-black/10 bg-gradient-to-br ${category.accent} shadow-[0_16px_36px_rgba(15,23,42,0.10)] sm:h-24 sm:w-24 sm:rounded-[1.45rem]`}
+      className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-black/10 bg-gradient-to-br ${category.accent} shadow-[0_12px_24px_rgba(15,23,42,0.08)] sm:h-16 sm:w-16 sm:rounded-[1.05rem] sm:shadow-[0_16px_36px_rgba(15,23,42,0.10)]`}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.72),transparent_46%)]" />
-      <div className="absolute inset-3 rounded-[1.05rem] border border-white/45 bg-white/18 backdrop-blur-sm" />
-      <div className="relative flex h-full flex-col justify-between p-3 text-white">
-        <span className="text-[11px] font-semibold leading-4 tracking-[0.08em]">
+      <div className="absolute inset-1 rounded-lg border border-white/45 bg-white/18 backdrop-blur-sm sm:inset-1.5 sm:rounded-[0.75rem]" />
+      <div className="relative flex h-full flex-col justify-between p-1.5 text-white sm:p-2">
+        <span className="text-[8px] font-semibold leading-3 tracking-normal sm:text-[9px]">
           {gradeLabel}
         </span>
         <div className="space-y-1">
-          <div className="h-1.5 w-10 rounded-full bg-white/80" />
-          <div className="h-1.5 w-14 rounded-full bg-white/60" />
-          <p className="text-xs font-bold leading-4">{category.labelKm}</p>
+          <div className="h-1 w-7 rounded-full bg-white/80" />
+          <div className="h-1 w-9 rounded-full bg-white/60" />
+          <p className="text-[9px] font-bold leading-3 sm:text-[10px]">
+            {category.labelKm}
+          </p>
         </div>
       </div>
     </div>
@@ -187,6 +195,8 @@ export default function CategoryResourcesSection({ language = "km" }) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedGrade, setSelectedGrade] = useState("all");
   const [selectedSubject, setSelectedSubject] = useState("all");
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -197,39 +207,64 @@ export default function CategoryResourcesSection({ language = "km" }) {
       : "Unable to load resources from the backend right now."
     : "";
 
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    async function loadResources() {
+  const loadResources = useCallback(
+    async ({ signal, showLoading = false } = {}) => {
       try {
-        setLoading(true);
-        setHasError(false);
-        const data = await fetchResources(
-          {},
-          { signal: abortController.signal },
-        );
+        if (showLoading) {
+          setLoading(true);
+        }
+
+        const data = await fetchResources({}, { signal });
+
+        if (signal?.aborted) {
+          return;
+        }
 
         setResources(Array.isArray(data) ? data : []);
+        setHasError(false);
+        setLoading(false);
       } catch (error) {
         if (error?.name === "AbortError") {
           return;
         }
 
-        setHasError(true);
-        setResources([]);
-      } finally {
-        if (!abortController.signal.aborted) {
+        if (showLoading) {
+          setHasError(true);
+          setResources([]);
           setLoading(false);
         }
       }
-    }
+    },
+    [],
+  );
 
-    loadResources();
+  useEffect(() => {
+    let abortController = new AbortController();
+
+    const refreshResources = (showLoading = false) => {
+      abortController.abort();
+      abortController = new AbortController();
+      void loadResources({
+        signal: abortController.signal,
+        showLoading,
+      });
+    };
+
+    refreshResources(true);
+
+    const intervalId = window.setInterval(
+      () => refreshResources(false),
+      LIVE_DATA_REFRESH_MS,
+    );
+    const handleFocus = () => refreshResources(false);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       abortController.abort();
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
     };
-  }, []);
+  }, [loadResources]);
 
   const preparedResources = useMemo(() => {
     return resources
@@ -272,6 +307,7 @@ export default function CategoryResourcesSection({ language = "km" }) {
     setSelectedCategory((currentCategory) =>
       currentCategory === categoryId ? "all" : categoryId,
     );
+    setCurrentPage(1);
   };
 
   const handleResetFilters = () => {
@@ -279,6 +315,8 @@ export default function CategoryResourcesSection({ language = "km" }) {
     setSelectedCategory("all");
     setSelectedGrade("all");
     setSelectedSubject("all");
+    setSortOrder("newest");
+    setCurrentPage(1);
   };
 
   const filteredResources = useMemo(() => {
@@ -303,6 +341,17 @@ export default function CategoryResourcesSection({ language = "km" }) {
       const leftTime = new Date(left.created_at || 0).getTime();
       const rightTime = new Date(right.created_at || 0).getTime();
 
+      if (sortOrder === "oldest") {
+        return (
+          leftTime - rightTime ||
+          khmerCollator.compare(left.sortLabel, right.sortLabel)
+        );
+      }
+
+      if (sortOrder === "title") {
+        return khmerCollator.compare(left.sortLabel, right.sortLabel);
+      }
+
       return (
         rightTime - leftTime ||
         khmerCollator.compare(left.sortLabel, right.sortLabel)
@@ -316,12 +365,29 @@ export default function CategoryResourcesSection({ language = "km" }) {
     selectedCategory,
     selectedGrade,
     selectedSubject,
+    sortOrder,
   ]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredResources.length / FILES_PER_PAGE),
+  );
+  const activePage = Math.min(currentPage, totalPages);
+  const paginatedResources = useMemo(() => {
+    const startIndex = (activePage - 1) * FILES_PER_PAGE;
+    return filteredResources.slice(startIndex, startIndex + FILES_PER_PAGE);
+  }, [activePage, filteredResources]);
+  const shouldShowPagination = filteredResources.length > FILES_PER_PAGE;
+
+  const handleDownload = (event, resource) => {
+    event.stopPropagation();
+    void downloadResourceFile(resource);
+  };
 
   return (
     <section
       id="resources"
-      className="relative flex min-h-0 scroll-mt-24 overflow-hidden border-t border-black/10 bg-[#f9fafb] py-5 md:min-h-[calc(100dvh-5rem)] md:scroll-mt-24 md:py-7 lg:py-8"
+      className="relative flex min-h-0 scroll-mt-24 overflow-hidden border-t border-black/10 bg-[#f9fafb] py-4 md:scroll-mt-24 md:py-5 lg:py-6"
     >
       <div
         className="pointer-events-none absolute inset-0 z-0"
@@ -333,21 +399,25 @@ export default function CategoryResourcesSection({ language = "km" }) {
       />
 
       <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-16">
-        <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/82 p-4 shadow-[0_28px_90px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:p-5 md:p-6 lg:p-7">
+        <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/82 p-3 shadow-[0_28px_90px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:p-4 md:p-5">
           <div
             className="pointer-events-none absolute inset-0 opacity-80"
             style={panelTextureStyle}
           />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/85 via-white/35 to-transparent" />
 
-          <div className="relative mb-6 space-y-3 sm:space-y-4 lg:mb-10">
-            <div className="rounded-2xl border border-black/10 bg-white/90 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.04)] md:p-5">
+          <div className="relative mb-4 space-y-3 sm:space-y-4 lg:mb-6">
+            <div className="rounded-2xl border border-black/10 bg-white/90 p-3 shadow-[0_14px_36px_rgba(15,23,42,0.04)] md:p-4">
               <div className="grid gap-3 md:gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(280px,1.1fr)_minmax(220px,0.8fr)] lg:items-center">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 lg:pr-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-black/42">
+                  <p
+                    className={`text-xs font-semibold text-black/42 ${
+                      isKhmer ? "tracking-normal" : "uppercase tracking-[0.28em]"
+                    }`}
+                  >
                     {isKhmer ? "ប្រភេទ" : "Category"}
                   </p>
-                  <h3 className="text-lg font-bold text-black sm:text-xl md:text-2xl">
+                  <h3 className="text-base font-bold text-black sm:text-lg md:text-xl">
                     {isKhmer
                       ? "ស្វែងរកតាមប្រភេទឯកសារ"
                       : "Browse by resource category"}
@@ -355,37 +425,49 @@ export default function CategoryResourcesSection({ language = "km" }) {
                 </div>
 
                 <label className="relative block lg:mx-auto lg:w-full lg:max-w-xl">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-black/38">
+                  <span
+                    className={`mb-2 block text-xs font-semibold text-black/38 ${
+                      isKhmer ? "tracking-normal" : "uppercase tracking-[0.22em]"
+                    }`}
+                  >
                     {isKhmer ? "ស្វែងរក" : "Search"}
                   </span>
                   <Search className="pointer-events-none absolute left-4 top-[calc(50%+0.65rem)] h-4 w-4 -translate-y-1/2 text-black/45" />
                   <input
                     type="search"
                     value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      setCurrentPage(1);
+                    }}
                     placeholder={
                       isKhmer
                         ? "ស្វែងរកឯកសារតាមចំណងជើង ឬមុខវិជ្ជា..."
                         : "Search by title, subject, or keyword..."
                     }
-                    className="h-12 w-full rounded-xl border border-black/10 bg-[#fbfbfb] pl-11 pr-4 text-sm text-black outline-none transition-colors placeholder:text-black/40 focus:border-black/25 sm:h-14"
+                    className="h-11 w-full rounded-xl border border-black/10 bg-[#fbfbfb] pl-11 pr-4 text-sm text-black outline-none transition-colors placeholder:text-black/40 focus:border-black/25 sm:h-12"
                   />
                 </label>
 
                 <label className="relative block w-full lg:ml-auto lg:max-w-[240px]">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-black/38">
-                    {isKhmer ? "តម្រៀប" : "Filter"}
+                  <span
+                    className={`mb-2 block text-xs font-semibold text-black/38 ${
+                      isKhmer ? "tracking-normal" : "uppercase tracking-[0.22em]"
+                    }`}
+                  >
+                    {isKhmer ? "ប្រភេទ" : "Category"}
                   </span>
                   <SlidersHorizontal className="pointer-events-none absolute left-4 top-[calc(50%+0.65rem)] h-4 w-4 -translate-y-1/2 text-black/45" />
                   <select
                     value={selectedCategory}
-                    onChange={(event) =>
-                      setSelectedCategory(event.target.value)
-                    }
-                    className="h-12 w-full appearance-none rounded-xl border border-black/10 bg-[#fbfbfb] pl-11 pr-4 text-sm text-black outline-none transition-colors focus:border-black/25 sm:h-14"
+                    onChange={(event) => {
+                      setSelectedCategory(event.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-11 w-full appearance-none rounded-xl border border-black/10 bg-[#fbfbfb] pl-11 pr-4 text-sm text-black outline-none transition-colors focus:border-black/25 sm:h-12"
                   >
                     <option value="all">
-                      {isKhmer ? "តម្រៀបតាមប្រភេទឯកសារ" : "Filter by category"}
+                      {isKhmer ? "ប្រភេទទាំងអស់" : "All categories"}
                     </option>
                     {CATEGORY_DEFINITIONS.map((category) => (
                       <option key={category.id} value={category.id}>
@@ -397,7 +479,7 @@ export default function CategoryResourcesSection({ language = "km" }) {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/8 bg-[#f7f8f9] px-3 py-3 sm:px-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/8 bg-[#f7f8f9] px-3 py-2.5 sm:px-4">
               <div className="flex flex-wrap items-center gap-2 text-sm text-black/55">
                 <span className="rounded-full border border-black/8 bg-white px-3 py-1.5">
                   {isKhmer
@@ -414,7 +496,17 @@ export default function CategoryResourcesSection({ language = "km" }) {
                       : "Showing all categories"}
                 </span>
                 <span className="rounded-full border border-black/8 bg-white px-3 py-1.5">
-                  {isKhmer ? "តម្រៀបថ្មីទៅចាស់" : "Newest to oldest"}
+                  {sortOrder === "oldest"
+                    ? isKhmer
+                      ? "ចាស់ទៅថ្មី"
+                      : "Oldest first"
+                    : sortOrder === "title"
+                      ? isKhmer
+                        ? "តាមចំណងជើង"
+                        : "Title A-Z"
+                      : isKhmer
+                        ? "ថ្មីទៅចាស់"
+                        : "Newest first"}
                 </span>
               </div>
 
@@ -422,7 +514,10 @@ export default function CategoryResourcesSection({ language = "km" }) {
                 <label className="relative block w-full sm:w-[190px]">
                   <select
                     value={selectedGrade}
-                    onChange={(event) => setSelectedGrade(event.target.value)}
+                    onChange={(event) => {
+                      setSelectedGrade(event.target.value);
+                      setCurrentPage(1);
+                    }}
                     className="h-11 w-full appearance-none rounded-full border border-black/10 bg-white px-4 text-sm text-black outline-none transition-colors focus:border-black/25"
                   >
                     <option value="all">
@@ -439,7 +534,10 @@ export default function CategoryResourcesSection({ language = "km" }) {
                 <label className="relative block w-full sm:w-[240px]">
                   <select
                     value={selectedSubject}
-                    onChange={(event) => setSelectedSubject(event.target.value)}
+                    onChange={(event) => {
+                      setSelectedSubject(event.target.value);
+                      setCurrentPage(1);
+                    }}
                     className="h-11 w-full appearance-none rounded-full border border-black/10 bg-white px-4 text-sm text-black outline-none transition-colors focus:border-black/25"
                   >
                     <option value="all">
@@ -453,13 +551,28 @@ export default function CategoryResourcesSection({ language = "km" }) {
                   </select>
                 </label>
 
+                <label className="relative block w-full sm:w-[190px]">
+                  <select
+                    value={sortOrder}
+                    onChange={(event) => {
+                      setSortOrder(event.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-11 w-full appearance-none rounded-full border border-black/10 bg-white px-4 text-sm text-black outline-none transition-colors focus:border-black/25"
+                  >
+                    <option value="newest">{isKhmer ? "ថ្មីទៅចាស់" : "Newest first"}</option>
+                    <option value="oldest">{isKhmer ? "ចាស់ទៅថ្មី" : "Oldest first"}</option>
+                    <option value="title">{isKhmer ? "តាមចំណងជើង" : "Title A-Z"}</option>
+                  </select>
+                </label>
+
                 {hasActiveFilters ? (
                   <button
                     type="button"
                     onClick={handleResetFilters}
                     className="inline-flex h-11 items-center justify-center rounded-full border border-black/10 bg-white px-4 text-sm font-semibold text-black/70 transition-colors hover:border-black/20 hover:text-black"
                   >
-                    {isKhmer ? "សម្អាតការតម្រៀប" : "Clear filters"}
+                    {isKhmer ? "សម្អាត" : "Clear"}
                   </button>
                 ) : null}
               </div>
@@ -467,22 +580,13 @@ export default function CategoryResourcesSection({ language = "km" }) {
           </div>
 
           <div className="relative flex flex-1 min-h-0 flex-col gap-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="inline-flex w-full items-center gap-2 rounded-full border border-black/10 bg-white/95 px-4 py-2 text-sm font-medium text-black/70 shadow-sm sm:w-auto">
-                <Send className="h-4 w-4" />
-                {isKhmer
-                  ? "ទិន្នន័យពី admin backend"
-                  : "Data from the admin backend"}
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="hidden gap-3 lg:grid xl:grid-cols-5">
               {CATEGORY_DEFINITIONS.map((category) => (
                 <button
                   key={category.id}
                   type="button"
                   onClick={() => handleCategorySelect(category.id)}
-                  className={`group rounded-xl border px-4 py-4 text-left transition-all duration-300 ${
+                  className={`group rounded-xl border px-3 py-3 text-left transition-all duration-300 ${
                     selectedCategory === category.id
                       ? "border-black bg-black text-white shadow-[0_14px_34px_rgba(15,23,42,0.10)]"
                       : "border-black/10 bg-white/92 text-black shadow-[0_8px_24px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-black/20 hover:bg-white"
@@ -490,11 +594,11 @@ export default function CategoryResourcesSection({ language = "km" }) {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-base font-bold md:text-lg">
+                      <p className="text-sm font-bold md:text-base">
                         {isKhmer ? category.labelKm : category.labelEn}
                       </p>
                       <p
-                        className={`mt-1 text-sm ${
+                        className={`mt-1 text-xs ${
                           selectedCategory === category.id
                             ? "text-white/75"
                             : "text-black/55"
@@ -517,18 +621,26 @@ export default function CategoryResourcesSection({ language = "km" }) {
               ))}
             </div>
 
-            <div className="rounded-2xl border border-black/10 bg-white/70 p-4 shadow-[0_14px_38px_rgba(15,23,42,0.04)] md:p-5">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-black/8 pb-4">
+            <div className="rounded-2xl border border-black/10 bg-white/70 p-3 shadow-[0_14px_38px_rgba(15,23,42,0.04)] md:p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-black/8 pb-3">
                 <div>
-                  <h4 className="text-lg font-bold text-black">
+                  <h4 className="text-base font-bold text-black md:text-lg">
                     {isKhmer
                       ? "ឯកសារពីបណ្ណាល័យសិក្សា"
                       : "Files from the learning library"}
                   </h4>
                   <p className="mt-1 text-sm text-black/55">
-                    {isKhmer
-                      ? "បញ្ជីឯកសារត្រូវបានរៀបតាមថ្ងៃបន្ថែមថ្មីបំផុត ហើយអាចបើកឬទាញយកបានភ្លាមៗ។"
-                      : "Resources are sorted from newest to oldest and can be opened right away."}
+                    {sortOrder === "oldest"
+                      ? isKhmer
+                        ? "បញ្ជីឯកសារត្រូវបានរៀបពីចាស់ទៅថ្មី ហើយអាចបើកឬទាញយកបានភ្លាមៗ។"
+                        : "Resources are sorted from oldest to newest and can be opened right away."
+                      : sortOrder === "title"
+                        ? isKhmer
+                          ? "បញ្ជីឯកសារត្រូវបានរៀបតាមចំណងជើង ហើយអាចបើកឬទាញយកបានភ្លាមៗ។"
+                          : "Resources are sorted by title and can be opened right away."
+                        : isKhmer
+                          ? "បញ្ជីឯកសារត្រូវបានរៀបតាមថ្ងៃបន្ថែមថ្មីបំផុត ហើយអាចបើកឬទាញយកបានភ្លាមៗ។"
+                          : "Resources are sorted from newest to oldest and can be opened right away."}
                   </p>
                 </div>
                 <span className="rounded-full border border-black/8 bg-[#f7f8f9] px-3 py-1.5 text-sm font-medium text-black/60">
@@ -538,18 +650,18 @@ export default function CategoryResourcesSection({ language = "km" }) {
                 </span>
               </div>
 
-              <div className="grid gap-4 overflow-x-hidden lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
+              <div className="grid gap-3 overflow-x-hidden lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
                 {loading &&
                   Array.from({ length: 3 }).map((_, index) => (
                     <div
                       key={index}
-                      className="flex flex-col gap-4 rounded-2xl border border-black/10 bg-white/94 p-4 shadow-[0_10px_28px_rgba(15,23,42,0.04)] sm:flex-row sm:items-center"
+                      className="flex gap-3 rounded-2xl border border-black/10 bg-white/94 p-3 shadow-[0_10px_28px_rgba(15,23,42,0.04)] sm:items-center"
                     >
-                      <div className="h-20 w-20 animate-pulse rounded-[1.2rem] bg-black/8 sm:h-24 sm:w-24 sm:rounded-[1.35rem]" />
-                      <div className="flex-1 space-y-3">
-                        <div className="h-4 w-28 animate-pulse rounded-full bg-black/8" />
-                        <div className="h-6 w-2/3 animate-pulse rounded-full bg-black/8" />
-                        <div className="h-4 w-full animate-pulse rounded-full bg-black/8" />
+                      <div className="h-14 w-14 shrink-0 animate-pulse rounded-[0.9rem] bg-black/8 sm:h-16 sm:w-16 sm:rounded-[1.05rem]" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 w-28 animate-pulse rounded-full bg-black/8" />
+                        <div className="h-5 w-2/3 animate-pulse rounded-full bg-black/8" />
+                        <div className="h-3 w-full animate-pulse rounded-full bg-black/8" />
                       </div>
                     </div>
                   ))}
@@ -578,12 +690,22 @@ export default function CategoryResourcesSection({ language = "km" }) {
 
                 {!loading &&
                   !hasError &&
-                  filteredResources.map((resource) => (
+                  paginatedResources.map((resource) => (
                     <article
                       key={resource.id}
-                    className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:border-black/15 hover:shadow-[0_16px_38px_rgba(15,23,42,0.07)] md:p-5"
+                      className="relative cursor-pointer rounded-xl border border-black/10 bg-white p-2 shadow-[0_8px_22px_rgba(15,23,42,0.035)] transition-all duration-300 hover:-translate-y-0.5 hover:border-black/15 hover:shadow-[0_16px_38px_rgba(15,23,42,0.07)] sm:rounded-2xl sm:p-3 sm:shadow-[0_10px_28px_rgba(15,23,42,0.04)]"
                     >
-                      <div className="flex flex-col gap-4 md:flex-row md:items-start">
+                      {resource.openUrl ? (
+                        <a
+                          href={resource.openUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Open ${resource.title}`}
+                          className="absolute inset-0 z-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/15 sm:rounded-2xl"
+                        />
+                      ) : null}
+
+                      <div className="pointer-events-none relative z-10 flex flex-row items-start gap-2.5 sm:gap-3">
                         <ResourcePreview
                           category={resource.category}
                           gradeLabel={
@@ -596,23 +718,23 @@ export default function CategoryResourcesSection({ language = "km" }) {
                         />
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-black px-3 py-1 text-xs font-semibold text-white shadow-sm">
+                          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+                            <span className="rounded-full bg-black px-2 py-0.5 text-[10px] font-semibold leading-4 text-white shadow-sm sm:px-2.5 sm:text-[11px]">
                               {isKhmer
                                 ? resource.category.labelKm
                                 : resource.category.labelEn}
                             </span>
-                            <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-3 py-1 text-xs font-medium text-black/65">
+                            <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-2 py-0.5 text-[10px] font-medium leading-4 text-black/65 sm:px-2.5 sm:text-[11px]">
                               {isKhmer
                                 ? resource.subjectKm
                                 : resource.subjectEn}
                             </span>
-                            <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-3 py-1 text-xs font-medium text-black/65">
+                            <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-2 py-0.5 text-[10px] font-medium leading-4 text-black/65 sm:px-2.5 sm:text-[11px]">
                               {isKhmer
                                 ? resource.gradeLabelKm
                                 : resource.gradeLabelEn}
                             </span>
-                            <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-3 py-1 text-xs font-medium text-black/65">
+                            <span className="rounded-full border border-black/8 bg-[#f5f6f7] px-2 py-0.5 text-[10px] font-medium leading-4 text-black/65 sm:px-2.5 sm:text-[11px]">
                               {resource.file_type === "image"
                                 ? isKhmer
                                   ? "រូបភាព"
@@ -623,27 +745,26 @@ export default function CategoryResourcesSection({ language = "km" }) {
                             </span>
                           </div>
 
-                          <h3 className="mt-3 text-lg font-bold leading-snug text-black md:text-xl">
+                          <h3 className="mt-1.5 text-[13px] font-bold leading-snug text-black sm:mt-2 sm:text-base">
                             {resource.title}
                           </h3>
-                          <p className="mt-2 max-w-4xl text-sm leading-7 text-black/65">
+                          <p className="mt-0.5 line-clamp-1 max-w-4xl text-[11px] leading-4 text-black/65 sm:mt-1 sm:line-clamp-2 sm:text-sm sm:leading-5">
                             {resource.description}
                           </p>
 
-                          <div className="mt-4 flex flex-wrap items-center gap-3 pt-1">
-                            {resource.fileUrl ? (
-                              <a
-                                href={resource.fileUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-black px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-black hover:text-white sm:w-auto sm:min-w-[132px]"
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:mt-3 sm:gap-2">
+                            {resource.downloadUrl ? (
+                              <button
+                                type="button"
+                                onClick={(event) => handleDownload(event, resource)}
+                                className="pointer-events-auto inline-flex items-center justify-center gap-1.5 rounded-full border border-black px-2.5 py-1 text-[11px] font-semibold text-black transition-colors hover:bg-black hover:text-white sm:min-w-[116px] sm:px-3 sm:py-1.5 sm:text-xs"
                               >
-                                <Download className="h-4 w-4" />
-                                {isKhmer ? "បើកឯកសារ" : "Open file"}
-                              </a>
+                                <Download className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                Download
+                              </button>
                             ) : null}
                             {resource.createdAtLabel && (
-                              <span className="text-xs font-medium text-black/45">
+                              <span className="text-[10px] font-medium text-black/45 sm:text-xs">
                                 {isKhmer
                                   ? `បានបន្ថែម ${resource.createdAtLabel}`
                                   : `Added ${resource.createdAtLabel}`}
@@ -655,6 +776,16 @@ export default function CategoryResourcesSection({ language = "km" }) {
                     </article>
                   ))}
               </div>
+
+              {!loading && !hasError && shouldShowPagination ? (
+                <div className="mt-5 border-t border-black/8 pt-4">
+                  <Pagination
+                    page={activePage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                  />
+                </div>
+              ) : null}
 
               {loading && (
                 <div className="flex items-center justify-center gap-2 text-sm text-black/50">

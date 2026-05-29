@@ -17,10 +17,16 @@ DEFAULT_CORS_ORIGINS = [
     "http://localhost:5174",
     "http://localhost:5175",
     "http://localhost:5176",
+    "http://localhost:5177",
+    "http://localhost:5178",
+    "http://localhost:5179",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
     "http://127.0.0.1:5175",
     "http://127.0.0.1:5176",
+    "http://127.0.0.1:5177",
+    "http://127.0.0.1:5178",
+    "http://127.0.0.1:5179",
 ]
 
 
@@ -44,9 +50,6 @@ app = FastAPI(
 Base.metadata.create_all(bind=engine)
 ensure_storage_dirs()
 
-with SessionLocal() as startup_db:
-    ensure_default_admin(startup_db)
-
 
 def ensure_resources_schema():
     inspector = inspect(engine)
@@ -63,10 +66,13 @@ def ensure_resources_schema():
             "thumbnail_path": "ALTER TABLE resources ADD COLUMN thumbnail_path VARCHAR(500)",
             "category": "ALTER TABLE resources ADD COLUMN category VARCHAR(100)",
             "original_filename": "ALTER TABLE resources ADD COLUMN original_filename VARCHAR(255)",
+            "file_hash": "ALTER TABLE resources ADD COLUMN file_hash VARCHAR(64)",
             "external_url": "ALTER TABLE resources ADD COLUMN external_url VARCHAR(500)",
             "is_published": f"ALTER TABLE resources ADD COLUMN is_published BOOLEAN DEFAULT {boolean_default}",
             "cloudinary_public_id": "ALTER TABLE resources ADD COLUMN cloudinary_public_id VARCHAR(500)",
             "cloudinary_resource_type": "ALTER TABLE resources ADD COLUMN cloudinary_resource_type VARCHAR(50)",
+            "thumbnail_cloudinary_public_id": "ALTER TABLE resources ADD COLUMN thumbnail_cloudinary_public_id VARCHAR(500)",
+            "thumbnail_cloudinary_resource_type": "ALTER TABLE resources ADD COLUMN thumbnail_cloudinary_resource_type VARCHAR(50)",
         }
 
         for column_name, statement in resource_alterations.items():
@@ -75,6 +81,33 @@ def ensure_resources_schema():
 
 
 ensure_resources_schema()
+
+
+def ensure_users_schema():
+    inspector = inspect(engine)
+    if not inspector.has_table("users"):
+        return
+
+    with engine.begin() as connection:
+        columns = {
+            column["name"]
+            for column in inspector.get_columns("users")
+        }
+        user_alterations = {
+            "avatar_path": "ALTER TABLE users ADD COLUMN avatar_path VARCHAR(500)",
+            "avatar_cloudinary_public_id": "ALTER TABLE users ADD COLUMN avatar_cloudinary_public_id VARCHAR(500)",
+            "avatar_cloudinary_resource_type": "ALTER TABLE users ADD COLUMN avatar_cloudinary_resource_type VARCHAR(50)",
+        }
+
+        for column_name, statement in user_alterations.items():
+            if column_name not in columns:
+                connection.execute(text(statement))
+
+
+ensure_users_schema()
+
+with SessionLocal() as startup_db:
+    ensure_default_admin(startup_db)
 
 
 def ensure_events_schema():
@@ -119,10 +152,14 @@ def ensure_filter_indexes():
         "CREATE INDEX IF NOT EXISTS ix_resources_subject ON resources (subject)",
         "CREATE INDEX IF NOT EXISTS ix_resources_category ON resources (category)",
         "CREATE INDEX IF NOT EXISTS ix_resources_file_type ON resources (file_type)",
+        "CREATE INDEX IF NOT EXISTS ix_resources_file_hash ON resources (file_hash)",
         "CREATE INDEX IF NOT EXISTS ix_resources_is_published ON resources (is_published)",
         "CREATE INDEX IF NOT EXISTS ix_events_status ON events (status)",
         "CREATE INDEX IF NOT EXISTS ix_events_media_type ON events (media_type)",
         "CREATE INDEX IF NOT EXISTS ix_events_is_published ON events (is_published)",
+        "CREATE INDEX IF NOT EXISTS ix_resource_downloads_resource_id ON resource_downloads (resource_id)",
+        "CREATE INDEX IF NOT EXISTS ix_resource_downloads_downloaded_at ON resource_downloads (downloaded_at)",
+        "CREATE INDEX IF NOT EXISTS ix_resource_downloads_resource_file_type ON resource_downloads (resource_file_type)",
     ]
 
     with engine.begin() as connection:
@@ -139,6 +176,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 @app.get("/")

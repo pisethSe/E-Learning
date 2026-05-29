@@ -112,40 +112,28 @@ const textbookCovers = [
 
 const heroShowcaseImages = [
   {
-    src: "/hero-showcase/subjects-poster.png",
-    alt: "School subjects promotional poster",
+    src: "/hero-showcase/grade-12-chemistry.png",
+    alt: "Grade 12 chemistry textbook cover",
   },
   {
-    src: "/hero-showcase/study-platform-poster.png",
-    alt: "Study platform welcome poster",
-  },
-  {
-    src: "/hero-showcase/resource-access-poster.png",
-    alt: "Study materials resource access poster",
-  },
-  {
-    src: "/hero-showcase/study-platform.png",
-    alt: "Study platform promotional poster",
-  },
-  {
-    src: "/hero-showcase/subjects.png",
-    alt: "Subjects promotional poster",
-  },
-  {
-    src: "/hero-showcase/study-materials.png",
-    alt: "Study materials promotional poster",
-  },
-  {
-    src: "/book-covers/grade-12-math.jpg",
+    src: "/hero-showcase/grade-12-math.jpg",
     alt: "Grade 12 mathematics textbook cover",
   },
   {
-    src: "/book-covers/grade-11-biology.jpg",
-    alt: "Grade 11 biology textbook cover",
+    src: "/hero-showcase/grade-12-physics.webp",
+    alt: "Grade 12 physics textbook cover",
   },
   {
-    src: "/book-covers/grade-10-physics.png",
-    alt: "Grade 10 physics textbook cover",
+    src: "/hero-showcase/grade-12-geography.jpg",
+    alt: "Grade 12 geography textbook cover",
+  },
+  {
+    src: "/hero-showcase/grade-12-civics.webp",
+    alt: "Grade 12 civics textbook cover",
+  },
+  {
+    src: "/hero-showcase/grade-12-khmer.webp",
+    alt: "Grade 12 Khmer textbook cover",
   },
 ];
 
@@ -201,13 +189,13 @@ const heroContent = {
 const getHeroCardConfig = () => {
   if (typeof window === "undefined") {
     return {
-      width: 450,
-      height: 600,
-      cardDistance: 14,
-      verticalDistance: 14,
-      skewAmount: 2,
+      width: 420,
+      height: 560,
+      cardDistance: 10,
+      verticalDistance: 10,
+      skewAmount: 1,
       containerClassName:
-        "-translate-x-[13%] translate-y-[2%] scale-100 max-[1280px]:-translate-x-[14%] max-[1280px]:scale-[0.94] max-[1024px]:-translate-x-[5%] max-[1024px]:translate-y-[1%] max-[1024px]:scale-[0.8] max-[768px]:translate-x-[18%] max-[768px]:translate-y-[8%] max-[768px]:scale-[0.58]",
+        "-translate-x-[10%] translate-y-[1%] scale-100 max-[1280px]:-translate-x-[12%] max-[1280px]:scale-[0.94] max-[1024px]:-translate-x-[5%] max-[1024px]:scale-[0.82] max-[768px]:right-1/2 max-[768px]:translate-x-1/2 max-[768px]:translate-y-0 max-[768px]:scale-100 max-[768px]:origin-bottom",
     };
   }
 
@@ -215,36 +203,36 @@ const getHeroCardConfig = () => {
 
   if (viewportWidth <= 380) {
     return {
-      width: 244,
-      height: 325,
+      width: 198,
+      height: 264,
       cardDistance: 0,
       verticalDistance: 0,
       skewAmount: 0,
       containerClassName:
-        "right-1/2 translate-x-1/2 translate-y-[1%] scale-100 origin-bottom",
+        "right-1/2 translate-x-1/2 translate-y-0 scale-100 origin-bottom",
     };
   }
 
   if (viewportWidth <= 640) {
     return {
-      width: 280,
-      height: 373,
+      width: 210,
+      height: 280,
       cardDistance: 0,
       verticalDistance: 0,
       skewAmount: 0,
       containerClassName:
-        "right-1/2 translate-x-1/2 translate-y-[1%] scale-100 origin-bottom",
+        "right-1/2 translate-x-1/2 translate-y-0 scale-100 origin-bottom",
     };
   }
 
   return {
-    width: 450,
-    height: 600,
-    cardDistance: 14,
-    verticalDistance: 14,
-    skewAmount: 2,
+    width: 420,
+    height: 560,
+    cardDistance: 10,
+    verticalDistance: 10,
+    skewAmount: 1,
     containerClassName:
-      "-translate-x-[13%] translate-y-[2%] scale-100 max-[1280px]:-translate-x-[14%] max-[1280px]:scale-[0.94] max-[1024px]:-translate-x-[5%] max-[1024px]:translate-y-[1%] max-[1024px]:scale-[0.8] max-[768px]:translate-x-[18%] max-[768px]:translate-y-[8%] max-[768px]:scale-[0.58]",
+      "-translate-x-[10%] translate-y-[1%] scale-100 max-[1280px]:-translate-x-[12%] max-[1280px]:scale-[0.94] max-[1024px]:-translate-x-[5%] max-[1024px]:scale-[0.82]",
   };
 };
 
@@ -346,7 +334,7 @@ const HeroSection = ({ language = "km" }) => {
             </div>
           </div>
 
-          <div className="relative h-[350px] min-w-0 overflow-hidden min-[381px]:h-[398px] sm:h-[444px] md:h-[520px] lg:h-[635px] lg:overflow-visible xl:h-[665px]">
+          <div className="relative h-[292px] min-w-0 overflow-hidden min-[381px]:h-[312px] sm:h-[392px] md:h-[490px] lg:h-[590px] lg:overflow-visible xl:h-[615px]">
             <CardSwap
               width={heroCardConfig.width}
               height={heroCardConfig.height}
@@ -361,7 +349,7 @@ const HeroSection = ({ language = "km" }) => {
               {heroShowcaseImages.map((image, index) => (
                 <Card
                   key={image.src}
-                  className="rounded-2xl border border-black/10 bg-white p-0 text-black shadow-[0_18px_42px_rgba(15,23,42,0.12)]"
+                  className="rounded-xl border border-black/10 bg-white p-1.5 text-black shadow-[0_6px_14px_rgba(15,23,42,0.08)] sm:rounded-2xl sm:p-2 sm:shadow-[0_16px_36px_rgba(15,23,42,0.14)]"
                 >
                   <img
                     src={image.src}
@@ -369,7 +357,7 @@ const HeroSection = ({ language = "km" }) => {
                     decoding="async"
                     fetchPriority={index < 3 ? "high" : "auto"}
                     loading={index < 3 ? "eager" : "lazy"}
-                    className="block h-full w-full object-contain object-center"
+                    className="block h-full w-full rounded-lg object-contain object-center sm:rounded-xl"
                   />
                 </Card>
               ))}
@@ -380,7 +368,7 @@ const HeroSection = ({ language = "km" }) => {
         <div className="mt-7 border-t border-black/10 pt-6 lg:mt-8 lg:pt-7">
           <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-black/50">
+              <p className="text-sm font-semibold uppercase tracking-normal text-black/50">
                 {content.sliderEyebrow}
               </p>
               <h2 className="mt-2 text-xl font-bold leading-tight text-black sm:text-2xl lg:text-[1.65rem]">
