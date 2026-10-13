@@ -6,8 +6,9 @@ services:
     region: singapore
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    preDeployCommand: alembic upgrade head
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # preDeployCommand requires a paid Render plan, so migrations run as part of
+    # the start command to also work on the free plan. Alembic upgrades are idempotent.
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
@@ -27,6 +28,9 @@ services:
         value: true
       - key: AUTH_COOKIE_SAMESITE
         value: none
+      # Keep the interactive API docs off the public internet in production.
+      - key: ENABLE_API_DOCS
+        value: "false"
       - key: FRONTEND_ORIGINS
         value: https://e-learning-grade-a.onrender.com,https://e-learning-grade-a-admin.onrender.com
       - key: ADMIN_BOOTSTRAP_ACCOUNTS

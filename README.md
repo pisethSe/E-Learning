@@ -43,6 +43,14 @@ Backend setup:
 5. Run migrations from the project root with `npm run db:migrate`.
 6. Start the API with `npm run dev:backend`.
 
+Security and secrets:
+
+1. Real credentials live only in git-ignored files or platform env vars: `backend/.env` locally, Render environment variables in production. The `.env.example` files contain placeholders only.
+2. The API refuses to start when `DATABASE_URL` is PostgreSQL and `SECRET_KEY` is missing or a placeholder. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+3. Never put secrets in frontend variables: any `VITE_*` value is compiled into the public JavaScript bundle. Only `VITE_API_BASE_URL` belongs there.
+4. `render.yaml` sets `ENABLE_API_DOCS=false` so production hides `/docs`, `/redoc`, and `/openapi.json`.
+5. Before pushing, double-check nothing secret is staged: `git status` (no `.env`) and `git grep -nEi "(api_secret|password|token)\s*=" -- ':!*.lock'`. Rotate any credential that was ever committed, shared in chat, or emailed.
+
 Render deployment:
 
 1. Push this repository to GitHub.

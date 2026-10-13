@@ -40,11 +40,63 @@ def get_cors_origins():
     return sorted(set([*DEFAULT_CORS_ORIGINS, *configured_origins]))
 
 
+# Secrets that must never reach production. The API refuses to boot with a
+# production database (PostgreSQL) if SECRET_KEY is missing or still holds a
+# placeholder/example value.
+PLACEHOLDER_SECRET_KEYS = {
+    "",
+    "change-this-secret-key",
+    "your-secret-key-change-this-in-production",
+    "secret",
+    "changeme",
+}
+
+
+def is_placeholder_secret_key(value: str) -> bool:
+    return value.strip().lower() in PLACEHOLDER_SECRET_KEYS
+
+
+def ensure_safe_secret_key():
+    database_url = os.getenv("DATABASE_URL", "sqlite:///./e-learning.db")
+    uses_production_database = database_url.strip().lower().startswith(
+        ("postgres://", "postgresql://")
+    )
+
+    if not is_placeholder_secret_key(os.getenv("SECRET_KEY", "")):
+        return
+
+    if uses_production_database:
+        raise RuntimeError(
+            "Refusing to start: DATABASE_URL points to a production database but "
+            "SECRET_KEY is missing or a placeholder. Generate a strong secret with: "
+            'python -c "import secrets; print(secrets.token_urlsafe(48))"'
+        )
+
+    print(
+        "WARNING: SECRET_KEY is missing or a placeholder value. "
+        "Set a strong SECRET_KEY before deploying to production."
+    )
+
+
+# Public API docs (/docs, /redoc, /openapi.json). Enabled by default for local
+# development; disable in production with ENABLE_API_DOCS=false.
+API_DOCS_ENABLED = os.getenv("ENABLE_API_DOCS", "true").strip().lower() not in {
+    "false",
+    "0",
+    "no",
+    "off",
+}
+
+ensure_safe_secret_key()
+
 # Create FastAPI app instance
 app = FastAPI(
     title="JUJIA PASIFU E-Learning API",
     description="Backend API for grades 9-12 e-learning platform",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs" if API_DOCS_ENABLED else None,
+    redoc_url="/redoc" if API_DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if API_DOCS_ENABLED else None,
 )
 
 Base.metadata.create_all(bind=engine)
