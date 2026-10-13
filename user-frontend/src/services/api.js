@@ -53,28 +53,6 @@ export async function fetchResources(params = {}, options = {}) {
   return parseJsonResponse(response, "resources");
 }
 
-export async function fetchEvents(params = {}, options = {}) {
-  const searchParams = new URLSearchParams();
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      searchParams.set(key, String(value));
-    }
-  });
-
-  const queryString = searchParams.toString();
-  const url = queryString
-    ? buildUrl(`/api/events/?${queryString}`)
-    : buildUrl("/api/events/");
-
-  const response = await fetch(url, {
-    signal: options.signal,
-    cache: "no-store",
-  });
-
-  return parseJsonResponse(response, "events");
-}
-
 export function resolveFileUrl(filePath) {
   if (!filePath) {
     return "";
