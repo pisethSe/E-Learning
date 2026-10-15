@@ -5,15 +5,15 @@ import { Button } from "../components/ui/Button";
 const ADMIN_LOGIN_PRESETS = [
   {
     label: "Main admin",
-    email: "admin@gradea.local",
+    email: "main-admin@example.com",
   },
   {
     label: "Content admin",
-    email: "content@gradea.local",
+    email: "content-admin@example.com",
   },
   {
     label: "Support admin",
-    email: "support@gradea.local",
+    email: "support-admin@example.com",
   },
 ];
 

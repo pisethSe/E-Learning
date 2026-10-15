@@ -73,13 +73,7 @@ Cloudinary setup:
 1. Set `STORAGE_BACKEND=cloudinary`.
 2. Add your Cloudinary credentials with either `CLOUDINARY_URL` or `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`.
 
-Default admin emails:
-
-- `admin@gradea.local`
-- `content@gradea.local`
-- `support@gradea.local`
-
-Admin passwords live in `backend/.env`.
+Default admin accounts are created from `ADMIN_BOOTSTRAP_ACCOUNTS` (or `ADMIN_EMAIL` + `ADMIN_PASSWORD`) at first startup. Keep these values only in environment variables — never in the repository.
 
 npm run dev:backend
 npm run dev

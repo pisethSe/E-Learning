@@ -23,6 +23,9 @@ build/
 credentials.json
 secrets.json
 
+# Local deployment helper with real values — never commit
+render-env-vars.txt
+
 # Database
 *.db
 *.sqlite
