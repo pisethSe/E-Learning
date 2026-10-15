@@ -65,6 +65,9 @@ function getResourceScope(resource, mode) {
   return resource.file_type !== "audio" && !isPhotoResource(resource);
 }
 
+// Khmer-aware name comparison used to sort the dashboard by title.
+const nameCollator = new Intl.Collator("km", { numeric: true, sensitivity: "base" });
+
 function formatDate(value) {
   if (!value) {
     return "No date";
@@ -160,9 +163,27 @@ export default function ResourceTable({
         );
       })
       .sort((left, right) => {
-        const leftTime = new Date(left.created_at || 0).getTime();
-        const rightTime = new Date(right.created_at || 0).getTime();
-        return rightTime - leftTime;
+        // Group by category (catalog order) when no specific category filter is
+        // active, then sort by name — Khmer-aware — so the dashboard lists
+        // content in a predictable, category-first order.
+        if (!isAudioMode && selectedCategory === "all") {
+          const categoryRank = (resource) => {
+            const categoryId = normalizeCategoryId(resource.category);
+            const index = RESOURCE_CATEGORIES.findIndex(
+              (category) => category.id === categoryId,
+            );
+            return index === -1 ? RESOURCE_CATEGORIES.length : index;
+          };
+          const categoryDiff = categoryRank(left) - categoryRank(right);
+          if (categoryDiff !== 0) {
+            return categoryDiff;
+          }
+        }
+
+        return nameCollator.compare(
+          String(left.title || "").trim(),
+          String(right.title || "").trim(),
+        );
       });
   }, [
     isAudioMode,
