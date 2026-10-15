@@ -19,6 +19,15 @@ if database_url.drivername.startswith("sqlite"):
     engine_options["connect_args"] = {"check_same_thread": False}
 else:
     engine_options["pool_pre_ping"] = True
+    # Neon (serverless Postgres) closes idle TCP connections, which breaks
+    # long requests that hold a session for minutes (e.g. large audio uploads
+    # compressed before commit). TCP keepalives keep the pooled connections alive.
+    engine_options["connect_args"] = {
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+    }
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, **engine_options)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
