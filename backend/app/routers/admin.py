@@ -6,7 +6,7 @@ import json
 import os
 import zipfile
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File, Form
 from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -662,6 +662,7 @@ async def view_admin_resource(resource_id: int, db: Session = Depends(get_db)):
 
 @router.post("/resources/upload", response_model=schemas.ResourceResponse)
 async def upload_resource(
+    request: Request,
     title: str = Form(...),
     grade_level: int = Form(...),
     subject: str = Form(...),
@@ -670,11 +671,18 @@ async def upload_resource(
     category: str | None = Form(None),
     external_url: str | None = Form(None),
     is_published: bool = Form(True),
-    file: list[UploadFile] | UploadFile | None = File(None),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
     """Upload a new resource (file, image, or audio)."""
+
+    # Read uploaded files straight from the raw multipart form. The pinned
+    # FastAPI/pydantic pair mishandles `list[UploadFile]` parameters (it
+    # collapses repeated "file" parts to the last one), which silently broke
+    # multi-image -> PDF uploads. request.form().getlist() returns every part.
+    form = await request.form()
+    raw_files = form.getlist("file")
+    upload_files = normalize_resource_upload_files(raw_files)
 
     ensure_storage_dirs()
     normalized_file_type = normalize_resource_type(file_type)
@@ -685,7 +693,7 @@ async def upload_resource(
         category=category,
         file_type=normalized_file_type,
     )
-    upload_files = normalize_resource_upload_files(file)
+
     stored_file = None
     file_hash = calculate_uploads_hash(upload_files)
     duplicate = find_duplicate_resource(
@@ -734,6 +742,7 @@ async def upload_resource(
 
 @router.put("/resources/{resource_id}", response_model=schemas.ResourceResponse)
 async def update_resource(
+    request: Request,
     resource_id: int,
     title: str = Form(...),
     grade_level: int = Form(...),
@@ -743,13 +752,18 @@ async def update_resource(
     category: str | None = Form(None),
     external_url: str | None = Form(None),
     is_published: bool = Form(True),
-    file: list[UploadFile] | UploadFile | None = File(None),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
     resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
+
+    # Same multipart quirk as upload: read file parts from the raw form so
+    # every uploaded file is collected (see upload_resource).
+    form = await request.form()
+    raw_files = form.getlist("file")
+    upload_files = normalize_resource_upload_files(raw_files)
 
     normalized_file_type = normalize_resource_type(file_type)
     normalized_external_url = normalize_optional_url(external_url)
@@ -759,7 +773,6 @@ async def update_resource(
         category=category,
         file_type=normalized_file_type,
     )
-    upload_files = normalize_resource_upload_files(file)
     stored_file = None
     file_hash = calculate_uploads_hash(upload_files)
     duplicate = find_duplicate_resource(
